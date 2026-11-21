@@ -140,6 +140,12 @@
   color: var(--ink-dim);
 }
 
+.ph-source-waiting {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
 /* Rings */
 .ph-zone {
   flex: 0 0 auto;
@@ -177,25 +183,22 @@
   height: var(--d);
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  border: 1px solid var(--line);
+  /* --c-rgb is this stage's own color, set on the element. The hairline carries a tint of it. */
+  border: 1px solid rgba(var(--c-rgb), 0.3);
   transition:
     border-color 240ms linear,
     box-shadow 240ms linear;
 }
-.ph-ring-1 { --line: #e0dfdc; --ping: 0, 175, 159; }
-.ph-ring-2 { --line: #dad9d5; --ping: 0, 175, 159; }
-.ph-ring-3 { --line: rgba(0, 175, 159, 0.34); --ping: 0, 175, 159; box-shadow: 0 0 0 4px rgba(0, 175, 159, 0.05); }
-.ph-ring-4 { --line: rgba(0, 178, 113, 0.3); --ping: 0, 178, 113; }
 .ph-ring-active {
-  border-color: var(--teal);
-  box-shadow: 0 0 0 4px rgba(0, 175, 159, 0.09);
+  border-color: rgb(var(--c-rgb));
+  box-shadow: 0 0 0 4px rgba(var(--c-rgb), 0.12);
 }
 /* A ring pings outward when its count changes. */
 .ph-ring-ping {
   position: absolute;
   inset: -1px;
   border-radius: 50%;
-  border: 2px solid rgb(var(--ping));
+  border: 2px solid rgb(var(--c-rgb));
   pointer-events: none;
   animation: ph-ping 900ms var(--ease-out) forwards;
 }
@@ -209,6 +212,24 @@
     transform: scale(1.035);
   }
 }
+/* The arc: the hairline is the track, this is the meter. It shows the stage's share of refined articles, from twelve o'clock, clockwise. */
+.ph-arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+  pointer-events: none;
+}
+.ph-arc-fill {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition:
+    stroke-dasharray 700ms var(--ease-out),
+    stroke-dashoffset 700ms var(--ease-out);
+}
 .ph-tick {
   position: absolute;
   left: 50%;
@@ -221,8 +242,12 @@
   font-weight: 600;
   color: var(--ink-faint);
 }
+.ph-tick-count {
+  margin-left: 4px;
+  color: rgb(var(--c-rgb));
+}
 .ph-tick-active {
-  color: var(--teal-deep);
+  color: rgb(var(--c-rgb));
 }
 
 /* The orbiting dot. Starts at twelve o'clock, where the ring's own tick sits. */
@@ -419,6 +444,69 @@
   to {
     opacity: 0;
   }
+}
+.ph-row-here {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(0, 175, 159, 0.12);
+}
+.ph-here-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(0, 175, 159, 0.12);
+  color: var(--teal-deep);
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  vertical-align: middle;
+}
+.ph-step {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.ph-step-done { color: var(--green-deep); }
+.ph-step-active { color: var(--teal-deep); }
+.ph-step-queued { color: var(--ink-soft); }
+.ph-step-failed { color: #be0003; }
+.ph-step-skipped,
+.ph-step-waiting { color: var(--ink-dim); font-weight: 500; }
+.ph-core-word {
+  font-size: clamp(13px, 3.4cqw, 19px);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--green-deep);
+}
+.ph-source-article {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #edece9;
+  font-size: 14px;
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ph-here-value {
+  font-size: 15px;
+  font-weight: 700;
+}
+.ph-source-here {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(0, 175, 159, 0.12);
+}
+.ph-exit-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  align-self: center;
+}
+.ph-exit-here {
+  color: var(--teal-deep);
+  font-weight: 600;
 }
 .ph-row-n {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -625,7 +713,8 @@
     animation-duration: 600ms;
   }
   .ph-zone,
-  .ph-source {
+  .ph-source,
+  .ph-arc-fill {
     transition: none;
   }
   @keyframes ph-fade {

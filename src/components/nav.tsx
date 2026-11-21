@@ -10,7 +10,7 @@ const chat = { href: "/chat", label: "Chat" };
 function menus(admin: boolean) {
   return [
     { label: "Content", items: [{ href: "/articles", label: "Articles" }, { href: "/import", label: "Import" }, { href: "/integrations", label: "Integrations" }] },
-    { label: "Pipeline", items: [{ href: "/pipeline", label: "Refining path" }, { href: "/jobs", label: "Jobs" }, { href: "/metrics", label: "Pipeline metrics" }] },
+    { label: "Pipeline", items: [{ href: "/jobs", label: "Jobs" }, { href: "/metrics", label: "Pipeline metrics" }] },
     { label: "Agent", items: [{ href: "/agents", label: "Agent usage" }, ...(admin ? [{ href: "/traces", label: "Traces" }] : [])] },
   ];
 }

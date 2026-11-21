@@ -9,7 +9,6 @@ This is what each page shows and where its code lives.
 | `/jobs/[id]` | One job, live. Progress bar, count per status, one row per article. | `src/components/job-progress.tsx` |
 | `/analysis/[id]` | One article's report | `src/app/(app)/analysis/[id]/page.tsx` |
 | `/chat` | Chat with the agent, or compare original and refined answers. Saved conversations. | `src/app/(app)/chat/page.tsx` |
-| `/pipeline` | The refining path: rings narrowing to an AI-ready core, with each stage's real input and output | `src/app/(app)/pipeline/page.tsx` |
 | `/articles` | Every article: search, filter, sort, pages, inline tags, bulk refine | `src/app/(app)/articles/page.tsx` |
 | `/articles/[id]` | Opens the article's analysis page (or a preview with a Refine button if it has none) | `src/app/(app)/articles/[id]/page.tsx` |
 | `/traces` | Admin only. Agent traces with filters | `src/app/(app)/traces/page.tsx` |
@@ -48,13 +47,20 @@ Markdown renders through `react-markdown`. It does not run raw HTML from the art
 
 ## Refining path
 
-Four headline numbers, then a hero. Four rings are the stages: Ingest, Convert, Analyze, Enrich. The core is AI-ready. A card on the left is the whole knowledge base.
+It sits on Home, under the title. Four headline numbers, then a hero. Four rings are the stages: Ingest, Convert, Analyze, Enrich. The core is AI-ready. A card on the left is the whole knowledge base.
 
-Counts are for the **latest job**. An article sits in the ring it is in now, and leaves it when it moves on. Finished articles show in the core. Articles with no findings, skipped ones and failed ones are listed under the state list as having left the path.
+**With no article picked** it shows counts. Every article is counted once, in the stage it is in now. Every count has an arc, and together the arcs add up to all refined articles. Each of the four rings is a stage's share, and its tick shows the count. A ring around the core is the AI-ready share. A thin outer ring splits the articles that left early: grey for no gaps, red for failed. Arcs start at twelve o'clock and fill clockwise. An empty stage has no arc. Finished articles show in the core. Articles with no open findings, and failed ones, are listed under the state list as having left the path. Articles never refined wait on the source card.
 
-Pick a state. The rings narrow and a dot orbits that state's ring. The side shows what the state does, and one real article's input and output at that step. Use the **KB article** picker to change which article it shows. The strip at the bottom is the average mechanical score at the raw, converted and rewritten versions of this job.
+**Pick an article** from the dropdown. It lists every article with its stage, and the ones being worked on come first. The path then shows that article alone:
 
-While the worker is busy the page refreshes every 5 seconds. A number that changes slides into place. A row washes green, its ring pings, and the core ripples when another article becomes AI-ready. Reduced motion swaps these for plain fades.
+- Each step reads Done, In progress, Queued, Failed, Not needed or Waiting. Its ring arc is full when done, half when in progress or failed, and red when failed.
+- A dot orbits the ring it is on. The core says whether it is AI-ready.
+- The chip shows its step, such as "step 4 of 5".
+- The score strip shows its own scores. Choose **All articles** to go back to the counts.
+
+**Pick a state.** The rings narrow and a dot orbits that ring. The side shows what the state does, and the chosen article's real input and output at that step. With no article picked it asks you to pick one. The strip at the bottom is the average mechanical score at the raw, converted and rewritten versions.
+
+While the worker is busy the page refreshes every 5 seconds. A number that changes slides into place. A row washes green, its ring pings, the arc eases to its new length, and the core ripples when another article becomes AI-ready. Reduced motion swaps these for plain fades.
 
 Code: `src/lib/pipeline/path.ts` (data), `src/components/pipeline-hero.tsx` and `.css`, `live-number.tsx`.
 
