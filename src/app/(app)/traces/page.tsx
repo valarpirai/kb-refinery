@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Prisma } from "@/generated/prisma/client";
 import { formatDuration } from "@/lib/agent/trace-format";
+import { SPAN_KIND, spanKind, type SpanKind } from "@/lib/colors";
 import { db } from "@/lib/db";
 import { requirePageUser } from "@/lib/session";
 
@@ -143,7 +144,14 @@ export default async function TracesPage({ searchParams }: { searchParams: Promi
         <Link href="/traces" className="px-2 py-1.5 text-sm underline">Reset</Link>
       </form>
 
-      <p className="text-sm" aria-live="polite">{total} trace{total === 1 ? "" : "s"}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm" aria-live="polite">{total} trace{total === 1 ? "" : "s"}</p>
+        <ul className="flex flex-wrap gap-2 text-xs" aria-label="Span colors">
+          {(Object.keys(SPAN_KIND) as SpanKind[]).filter((k) => k !== "other").map((k) => (
+            <li key={k} className={`rounded-full px-2 py-0.5 ${SPAN_KIND[k].colors.soft}`}>{SPAN_KIND[k].label}</li>
+          ))}
+        </ul>
+      </div>
 
       {rows.length === 0 ? (
         <p className="text-sm opacity-70">No traces match. Ask the agent something in Chat, or widen the filters.</p>
@@ -166,10 +174,15 @@ export default async function TracesPage({ searchParams }: { searchParams: Promi
                 <tr key={r.traceId} className="border-b border-black/5 align-top dark:border-white/10">
                   <td className="py-2 pr-4 whitespace-nowrap">{r.started.toLocaleString()}</td>
                   <td className="pr-4">
-                    <Link href={`/traces/${r.traceId}`} className="font-medium text-blue-700 hover:underline dark:text-blue-300">
-                      {r.is_agent ? "Agent run" : r.root_name ?? "Trace"}
+                    <Link href={`/traces/${r.traceId}`} className="hover:underline">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${(r.is_agent ? SPAN_KIND.agent : SPAN_KIND[spanKind(r.root_name ?? "")]).colors.soft}`}>
+                        {r.is_agent ? "Agent run" : r.root_name ?? "Trace"}
+                      </span>
                     </Link>
-                    <span className="block text-xs opacity-70">{r.spans} spans{r.tool_names?.length ? ` · ${r.tool_names.join(", ")}` : ""}</span>
+                    <span className="mt-1 flex flex-wrap items-center gap-1 text-xs">
+                      <span className="opacity-70">{r.spans} spans</span>
+                      {r.tool_names?.map((t) => <span key={t} className={`rounded px-1.5 py-0.5 ${SPAN_KIND.tool.colors.soft}`}>{t}</span>)}
+                    </span>
                   </td>
                   <td className="pr-4 whitespace-nowrap">{formatDuration(r.agent_ms ?? r.total_ms)}</td>
                   <td className="pr-4">{r.model_calls}</td>

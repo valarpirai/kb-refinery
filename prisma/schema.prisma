@@ -182,11 +182,12 @@ model Article {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  dataSource DataSource? @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
-  importRun  ImportRun?  @relation(fields: [importRunId], references: [id], onDelete: SetNull)
-  analysis   Analysis?
-  jobItems   JobItem[]
-  chunks     Chunk[]
+  dataSource  DataSource?  @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
+  importRun   ImportRun?   @relation(fields: [importRunId], references: [id], onDelete: SetNull)
+  analysis    Analysis?
+  jobItems    JobItem[]
+  chunks      Chunk[]
+  articleTags ArticleTag[]
 
   @@unique([dataSourceId, externalId])
   @@index([knowledgeBase])
@@ -361,6 +362,11 @@ model JobItem {
   status      JobItemStatus @default(pending)
   batchNumber Int           @default(0)
   message     String?
+  failedStage String? // convert | analyze | enrich | rewrite, set when status is failed
+  restarts    Int           @default(0)
+  heartbeatAt DateTime? // set by the worker while it runs this item
+  claimedBy   String? // id of the worker that holds this item
+  attempts    Int           @default(0) // times a worker has claimed it
   updatedAt   DateTime      @updatedAt
 
   job      Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -369,6 +375,7 @@ model JobItem {
 
   @@unique([jobId, articleId])
   @@index([jobId, status])
+  @@index([status, heartbeatAt])
 }
 
 /// LLM prompts as data. `template` uses {{var}} placeholders.
@@ -609,4 +616,28 @@ model TraceSpan {
 
   @@index([traceId, startedAt])
   @@index([startedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Tags
+// ---------------------------------------------------------------------------
+
+/// A label you can put on any article. Names are stored lowercase.
+model Tag {
+  id        String       @id @default(cuid())
+  name      String       @unique
+  createdAt DateTime     @default(now())
+  articles  ArticleTag[]
+}
+
+model ArticleTag {
+  articleId String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, tagId])
+  @@index([tagId])
 }

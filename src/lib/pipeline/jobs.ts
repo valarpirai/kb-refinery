@@ -4,10 +4,15 @@ import { syncAllSchedules } from "@/lib/ingest/schedule";
 import { answerArm, judgeComparison } from "@/lib/chat/answer";
 import { indexAll } from "@/lib/chat/indexer";
 import { runAgentMessage } from "@/lib/agent/run";
-import { AGENT_QUEUE, ANSWER_QUEUE, getBoss, INDEX_QUEUE, JUDGE_QUEUE, PULL_QUEUE, REFINE_QUEUE } from "@/lib/queue";
-import { processJobItem } from "./run-article";
+import { reconcileJobs } from "./reconcile";
+import { AGENT_QUEUE, ANSWER_QUEUE, getBoss, RECONCILE_QUEUE, INDEX_QUEUE, JUDGE_QUEUE, PULL_QUEUE, REFINE_QUEUE } from "@/lib/queue";
+import { processJobItem, type Stage } from "./run-article";
+import { WORKER_ID } from "./worker-id";
 
 const BATCH_SIZE = 5;
+
+/** The status an item shows while a worker is on each stage. */
+const RUNNING_STATUS = { convert: "converting", analyze: "analyzing", enrich: "enriching", rewrite: "scoring" } as const;
 
 /**
  * Create a job with one item per article and queue each item for processing.
@@ -67,12 +72,19 @@ export async function finalizeJobIfDone(jobId: string): Promise<void> {
 /** Start consuming the refine queue. One article at a time, since the local model is the bottleneck. */
 export async function startWorker(): Promise<void> {
   const boss = await getBoss();
-  await boss.work<{ jobItemId: string }>(REFINE_QUEUE, async (jobs) => {
+  await boss.work<{ jobItemId: string; fromStage?: Stage }>(REFINE_QUEUE, async (jobs) => {
     for (const j of jobs) {
-      const item = await db.jobItem.findUnique({ where: { id: j.data.jobItemId } });
-      if (!item) continue;
-      await db.job.updateMany({ where: { id: item.jobId, status: "pending" }, data: { status: "running", startedAt: new Date() } });
-      await processJobItem(item.id);
+      const fromStage = j.data.fromStage ?? "convert";
+      // Take the item in one atomic step. If another worker has it, or it is already done,
+      // this message is a duplicate and is dropped. That is what makes the job idempotent.
+      const claimed = await db.jobItem.updateMany({
+        where: { id: j.data.jobItemId, status: "pending" },
+        data: { status: RUNNING_STATUS[fromStage], claimedBy: WORKER_ID, heartbeatAt: new Date(), attempts: { increment: 1 } },
+      });
+      if (claimed.count === 0) continue;
+      const item = await db.jobItem.findUniqueOrThrow({ where: { id: j.data.jobItemId } });
+      await db.job.updateMany({ where: { id: item.jobId, status: { in: ["pending", "completed", "completed_with_errors", "failed"] } }, data: { status: "running", startedAt: new Date(), completedAt: null } });
+      await processJobItem(item.id, fromStage);
       await finalizeJobIfDone(item.jobId);
     }
   });
@@ -91,6 +103,11 @@ export async function startWorker(): Promise<void> {
   await boss.work<{ assistantId: string }>(AGENT_QUEUE, async (jobs) => {
     for (const j of jobs) await runAgentMessage(j.data.assistantId);
   });
+  await boss.work(RECONCILE_QUEUE, async () => {
+    await reconcileJobs();
+  });
+  // Every minute is the finest a cron schedule allows. One worker runs each tick.
+  await boss.schedule(RECONCILE_QUEUE, "* * * * *", {}, { key: "reconcile" });
   await syncAllSchedules();
   console.log("[worker] listening on", REFINE_QUEUE, "and", PULL_QUEUE);
 }

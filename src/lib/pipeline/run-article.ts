@@ -8,11 +8,20 @@ import { chatJson } from "./ollama";
 import { renderPrompt } from "./prompts";
 import { analysisSchema, CONTENT_GAP_TYPES, duplicateSchema, enrichmentSchema, scoreOnlySchema, synthesisSchema, type AnalysisResult } from "./schemas";
 import { scoreContent } from "./scorer";
+import { ClaimLostError, HEARTBEAT_MS, WORKER_ID } from "./worker-id";
 
 type ItemStatus = "pending" | "converting" | "analyzing" | "enriching" | "scoring" | "completed" | "failed" | "skipped";
 
+/**
+ * Update an item's status, but only while this worker still holds it.
+ * Also counts as a heartbeat. Throws ClaimLostError when the item was reassigned.
+ */
 async function setStatus(id: string, status: ItemStatus, message?: string) {
-  await db.jobItem.update({ where: { id }, data: { status, message: message ?? null } });
+  const result = await db.jobItem.updateMany({
+    where: { id, claimedBy: WORKER_ID },
+    data: { status, message: message ?? null, heartbeatAt: new Date(), ...(status === "failed" ? {} : { failedStage: null }) },
+  });
+  if (result.count === 0) throw new ClaimLostError();
 }
 
 /** Mechanical score and counters for one body of content. */
@@ -102,6 +111,9 @@ async function findDuplicates(jobId: string, analysisId: string, summary: string
     if (!data.same_topic) continue;
     const primary = data.more_complete_article === "a" ? analysisId : o.id;
     for (const [from, to] of [[analysisId, o.id], [o.id, analysisId]] as const) {
+      // A re-run must not add the same pair twice.
+      const exists = await db.finding.count({ where: { analysisId: from, relatedAnalysisId: to, type: "duplicate", state: { not: "cancelled" } } });
+      if (exists > 0) continue;
       await db.finding.create({
         data: { analysisId: from, type: "duplicate", severity: "medium", relatedAnalysisId: to,
           recommendedPrimaryId: primary, detail: data.reasoning, lastJobId: jobId },
@@ -221,47 +233,124 @@ async function synthesizeStage(
   });
 }
 
+/** The pipeline stages, in order. A failed item can be restarted from any of them. */
+export const STAGES = ["convert", "analyze", "enrich", "rewrite"] as const;
+export type Stage = (typeof STAGES)[number];
+
 /**
- * Run one article through the whole pipeline and record progress on its job item.
- * Never throws: a failure is recorded on the job item and the analysis.
- * @param jobItemId the job item to process
+ * Rebuild the analysis result from what an earlier run saved, so a restart can
+ * pick up after the analyze stage without asking the model again.
+ * @param analysisId the article's analysis
+ * @param version the snapshot version being resumed
+ * @return the same shape the analyze stage returns
  */
-export async function processJobItem(jobItemId: string): Promise<void> {
+async function rebuildAnalysis(analysisId: string, version: number): Promise<AnalysisResult> {
+  const a = await db.analysis.findUniqueOrThrow({ where: { id: analysisId } });
+  const converted = await db.snapshot.findUnique({ where: { analysisId_version_type: { analysisId, version, type: "converted" } } });
+  const findings = await db.finding.findMany({ where: { analysisId, state: "new", type: { not: "duplicate" } }, orderBy: { createdAt: "asc" } });
+  return {
+    quality_score: converted?.llmScore ?? 0,
+    target_audience: a.targetAudience ?? "mixed",
+    standardized_summary: a.standardizedSummary ?? "",
+    findings: findings.map((f) => ({ type: f.type, severity: f.severity ?? "medium", location: "", evidence: "", detail: f.detail ?? "" })),
+    search_terms: (a.searchTerms as string[]) ?? [],
+    product_mentions: [],
+    summary: "",
+  };
+}
+
+/**
+ * Run one article through the pipeline and record progress on its job item.
+ * Starts at `fromStage`. Anything other than "convert" reuses the content and
+ * results the earlier run already saved, so a restart repeats only the failed
+ * stage and the ones after it. Never throws: a failure is recorded on the job
+ * item along with the stage it happened in.
+ * @param jobItemId the job item to process
+ * @param fromStage where to start; defaults to the beginning
+ */
+export async function processJobItem(jobItemId: string, fromStage: Stage = "convert"): Promise<void> {
   const item = await db.jobItem.findUniqueOrThrow({ where: { id: jobItemId }, include: { article: true } });
   const { article, jobId } = item;
   let analysisId = item.analysisId;
+  let stage: Stage = fromStage;
+  // Prove we are alive while the model works. If the process dies, the beats stop and the reconciler takes over.
+  const heartbeat = setInterval(() => {
+    void db.jobItem
+      .updateMany({ where: { id: item.id, claimedBy: WORKER_ID, status: { in: ["converting", "analyzing", "enriching", "scoring"] } }, data: { heartbeatAt: new Date() } })
+      .catch(() => undefined);
+  }, HEARTBEAT_MS);
   try {
-    await setStatus(item.id, "converting");
     const existing = await db.analysis.findUnique({ where: { articleId: article.id } });
-    if (existing?.pipelineStage === "ready" && existing.sourceUpdatedAt && existing.sourceUpdatedAt >= article.updatedAt) {
-      await db.jobItem.update({ where: { id: item.id }, data: { status: "skipped", analysisId: existing.id, message: "Unchanged since last run" } });
-      return;
+
+    // A restart needs what the earlier run saved. If it is missing, start from the top.
+    let start = STAGES.indexOf(fromStage);
+    let version = 0;
+    let converted = "";
+    if (start > 0) {
+      const latest = existing ? await db.snapshot.findFirst({ where: { analysisId: existing.id }, orderBy: { version: "desc" } }) : null;
+      const conv = latest && existing
+        ? await db.snapshot.findUnique({ where: { analysisId_version_type: { analysisId: existing.id, version: latest.version, type: "converted" } } })
+        : null;
+      if (!existing || !latest || !conv) start = 0;
+      else {
+        analysisId = existing.id;
+        version = latest.version;
+        converted = conv.content;
+      }
     }
-    const analysis = existing
-      ? await db.analysis.update({ where: { id: existing.id }, data: { pipelineStage: "analyzing", lastJobId: jobId } })
-      : await db.analysis.create({ data: { articleId: article.id, pipelineStage: "analyzing", lastJobId: jobId } });
-    analysisId = analysis.id;
-    await db.jobItem.update({ where: { id: item.id }, data: { analysisId } });
-    await db.finding.updateMany({ where: { analysisId, state: { in: ["new", "acknowledged"] } }, data: { state: "cancelled" } });
-    const version = (await db.snapshot.count({ where: { analysisId, type: "raw" } })) + 1;
+    stage = STAGES[start];
 
-    const converted = await convertStage(article, analysisId, jobId, version);
+    if (start === 0) {
+      await setStatus(item.id, "converting");
+      if (existing?.pipelineStage === "ready" && existing.sourceUpdatedAt && existing.sourceUpdatedAt >= article.updatedAt && item.restarts === 0) {
+        await db.jobItem.update({ where: { id: item.id }, data: { status: "skipped", analysisId: existing.id, message: "Unchanged since last run" } });
+        return;
+      }
+      const analysis = existing
+        ? await db.analysis.update({ where: { id: existing.id }, data: { pipelineStage: "analyzing", lastJobId: jobId } })
+        : await db.analysis.create({ data: { articleId: article.id, pipelineStage: "analyzing", lastJobId: jobId } });
+      analysisId = analysis.id;
+      await db.jobItem.update({ where: { id: item.id }, data: { analysisId } });
+      await db.finding.updateMany({ where: { analysisId, state: { in: ["new", "acknowledged"] } }, data: { state: "cancelled" } });
+      // A crash can leave a version with a raw snapshot but no converted one. Drop it so a re-run starts clean.
+      const done = new Set((await db.snapshot.findMany({ where: { analysisId, type: "converted" }, select: { version: true } })).map((x) => x.version));
+      const partial = (await db.snapshot.findMany({ where: { analysisId, type: "raw" }, select: { version: true } })).map((x) => x.version).filter((v) => !done.has(v));
+      if (partial.length) await db.snapshot.deleteMany({ where: { analysisId, version: { in: partial } } });
+      version = ((await db.snapshot.aggregate({ where: { analysisId }, _max: { version: true } }))._max.version ?? 0) + 1;
+      converted = await convertStage(article, analysisId, jobId, version);
+    }
+    if (!analysisId) throw new Error("No analysis to continue from");
 
-    await setStatus(item.id, "analyzing");
-    const result = await analyzeStage(article, analysisId, jobId, version, converted);
-    const dupes = await findDuplicates(jobId, analysisId, result.standardized_summary, result.search_terms);
+    let result: AnalysisResult;
+    let dupes = 0;
+    if (start <= 1) {
+      stage = "analyze";
+      await setStatus(item.id, "analyzing");
+      await db.analysis.update({ where: { id: analysisId }, data: { pipelineStage: "analyzing", lastJobId: jobId } });
+      if (start === 1) await db.finding.updateMany({ where: { analysisId, state: { in: ["new", "acknowledged"] } }, data: { state: "cancelled" } });
+      result = await analyzeStage(article, analysisId, jobId, version, converted);
+      dupes = await findDuplicates(jobId, analysisId, result.standardized_summary, result.search_terms);
+    } else {
+      result = await rebuildAnalysis(analysisId, version);
+    }
 
     const needsEnrichment = result.findings.some((f) => CONTENT_GAP_TYPES.has(f.type));
     let enrichment: Awaited<ReturnType<typeof enrichStage>> | null = null;
-    if (needsEnrichment) {
+    if (start <= 2 && needsEnrichment) {
+      stage = "enrich";
       await setStatus(item.id, "enriching");
       await db.analysis.update({ where: { id: analysisId }, data: { pipelineStage: "restructuring" } });
       enrichment = await enrichStage(article, analysisId, result, converted);
+    } else if (start === 3) {
+      const saved = (await db.analysis.findUniqueOrThrow({ where: { id: analysisId } })).enrichmentKnowledge;
+      enrichment = (saved as unknown as Awaited<ReturnType<typeof enrichStage>>) ?? null;
     }
 
     if (result.findings.length > 0) {
+      stage = "rewrite";
       await setStatus(item.id, "scoring");
       await db.analysis.update({ where: { id: analysisId }, data: { pipelineStage: "validating" } });
+      await db.snapshot.deleteMany({ where: { analysisId, version, type: "enriched" } });
       await synthesizeStage(article, analysisId, jobId, version, result, enrichment, converted);
     }
 
@@ -274,8 +363,12 @@ export async function processJobItem(jobItemId: string): Promise<void> {
       data: { findingsGenerated: { increment: result.findings.length }, duplicatesFound: { increment: dupes } },
     });
   } catch (e) {
+    // Another worker owns this item now. Stop quietly and leave its data alone.
+    if (e instanceof ClaimLostError) return;
     const message = (e as Error).message.slice(0, 1000);
-    if (analysisId) await db.analysis.update({ where: { id: analysisId }, data: { pipelineStage: "failed" } });
-    await setStatus(item.id, "failed", message);
+    const held = await db.jobItem.updateMany({ where: { id: item.id, claimedBy: WORKER_ID }, data: { status: "failed", message, failedStage: stage, heartbeatAt: new Date() } });
+    if (held.count > 0 && analysisId) await db.analysis.update({ where: { id: analysisId }, data: { pipelineStage: "failed" } });
+  } finally {
+    clearInterval(heartbeat);
   }
 }

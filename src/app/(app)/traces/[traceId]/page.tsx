@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatDuration, spanLabel } from "@/lib/agent/trace-format";
+import { SPAN_KIND, spanKind, type SpanKind } from "@/lib/colors";
 import { db } from "@/lib/db";
 import { requirePageUser } from "@/lib/session";
 
@@ -82,24 +83,34 @@ export default async function TracePage({ params }: { params: Promise<{ traceId:
       {mine && <p className="text-sm"><Link href={`/chat?c=${mine.id}`} className="text-blue-700 underline dark:text-blue-300">Open the chat conversation</Link></p>}
 
       <section aria-labelledby="timeline">
-        <h2 id="timeline" className="mb-3 text-lg font-medium">Timeline</h2>
+        <h2 id="timeline" className="mb-2 text-lg font-medium">Timeline</h2>
+        <ul className="mb-3 flex flex-wrap gap-2 text-xs" aria-label="Span colors">
+          {(Object.keys(SPAN_KIND) as SpanKind[]).filter((k) => k !== "other").map((k) => (
+            <li key={k} className={`rounded-full px-2 py-0.5 ${SPAN_KIND[k].colors.soft}`}>{SPAN_KIND[k].label}</li>
+          ))}
+        </ul>
         <ol className="space-y-1">
           {ordered.map(({ span, depth }) => {
             const attrs = span.attributes as Attrs;
             const offset = ((span.startedAt.getTime() - t0) / total) * 100;
             const width = Math.max((span.durationMs / total) * 100, 0.4);
             const bad = span.status === "error";
+            const kind = SPAN_KIND[spanKind(span.name)];
             const key = KEY_ATTRS.filter((k) => attrs[k] !== undefined);
             const bodies = BODY_ATTRS.filter((k) => attrs[k] !== undefined);
             const rest = Object.keys(attrs).filter((k) => !KEY_ATTRS.includes(k) && !BODY_ATTRS.includes(k)).sort();
             return (
               <li key={span.spanId} style={{ marginLeft: `${Math.min(depth, 6) * 14}px` }}>
-                <details className="rounded border border-black/10 dark:border-white/15">
+                <details className={`rounded border border-l-4 border-black/10 dark:border-white/15 ${kind.colors.border}`}>
                   <summary className="grid cursor-pointer grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-3 px-3 py-2 text-sm">
                     <span className="min-w-0">
-                      <span className="block truncate font-medium">{spanLabel(span.name)}{bad && <span className="ml-2 text-red-700 dark:text-red-300">· error</span>}</span>
+                      <span className="flex items-center gap-2 truncate font-medium">
+                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide ${kind.colors.soft}`}>{kind.label}</span>
+                        <span className="truncate">{spanLabel(span.name)}</span>
+                        {bad && <span className="shrink-0 text-red-700 dark:text-red-300">· error</span>}
+                      </span>
                       <span className="mt-1 block h-1.5 rounded bg-black/5 dark:bg-white/10" aria-hidden="true">
-                        <span className={`block h-full rounded ${bad ? "bg-red-600" : "bg-blue-600"}`} style={{ marginLeft: `${offset}%`, width: `${width}%` }} />
+                        <span className={`block h-full rounded ${bad ? "bg-red-600" : kind.colors.solid}`} style={{ marginLeft: `${offset}%`, width: `${width}%` }} />
                       </span>
                     </span>
                     <span className="text-right text-xs tabular-nums">{formatDuration(span.durationMs)}</span>
