@@ -1,0 +1,68 @@
+/* Articles pages. Near no motion: this is a high-frequency list view. */
+
+.art-root :focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* Button press feedback. */
+.art-press {
+  transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.art-press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Colour change on hover, only for devices that really hover. */
+.art-hover {
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .art-hover:hover:not(:disabled) {
+    background-color: rgb(0 0 0 / 0.06);
+  }
+  .art-hover-solid:hover:not(:disabled) {
+    background-color: #1d4ed8;
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-color-scheme: dark) {
+  .art-hover:hover:not(:disabled) {
+    background-color: rgb(255 255 255 / 0.1);
+  }
+}
+
+/* Tag chip: appears and disappears with opacity + scale(0.95 -> 1). */
+.art-chip {
+  transition: opacity 150ms cubic-bezier(0.23, 1, 0.32, 1), transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
+  opacity: 1;
+  transform: scale(1);
+}
+@starting-style {
+  .art-chip {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+.art-chip[data-leaving="true"] {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .art-chip {
+    transition: opacity 150ms linear;
+    transform: none;
+  }
+  @starting-style {
+    .art-chip {
+      opacity: 0;
+      transform: none;
+    }
+  }
+  .art-chip[data-leaving="true"] {
+    transform: none;
+  }
+  .art-press:active:not(:disabled) {
+    transform: none;
+  }
+}

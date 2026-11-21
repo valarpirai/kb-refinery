@@ -1,0 +1,154 @@
+/*
+ * Pipeline view motion.
+ * Tier: occasional (glanced at while a run is in progress).
+ * Looping motion exists only to say "work is happening" (purpose: state indication)
+ * and stops as soon as the step is no longer active.
+ * Only transform and opacity animate. Colors/opacity transition by named property.
+ */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* ---- Node ---- */
+.pl-node {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: none;
+}
+.pl-dot {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition:
+    background-color 200ms var(--ease-out),
+    border-color 200ms var(--ease-out),
+    color 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+/* Active: larger (scale, not size) with a thicker ring. */
+.pl-dot[data-state="active"] {
+  transform: scale(1.2);
+  border-width: 3px;
+}
+.pl-dot[data-state="queued"] { border-style: dashed; }
+.pl-dot[data-state="pending"],
+.pl-dot[data-state="skipped"] { opacity: 0.7; }
+
+/* Live indicator: ring pulse on a pseudo-element (opacity + scale, compositor only). */
+.pl-node[data-state="active"]::before {
+  content: "";
+  position: absolute;
+  inset: 0.25rem;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  animation: pl-pulse 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes pl-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1.2); }
+  50% { opacity: 0; transform: scale(1.55); }
+}
+
+/* New check mark: fades and scales from 0.9 (never 0), only after a real state change. */
+.pl-pop { animation: pl-pop 200ms var(--ease-out) both; }
+@keyframes pl-pop {
+  from { opacity: 0; transform: scale(0.9); }
+}
+
+/* ---- Connectors ---- */
+.pl-seg {
+  position: relative;
+  overflow: hidden;
+  flex: 1 1 0;
+  border-radius: 9999px;
+  background: rgb(0 0 0 / 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  .pl-seg { background: rgb(255 255 255 / 0.18); }
+}
+.pl-seg[data-hidden="true"] { visibility: hidden; }
+.pl-seg-fill {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 200ms var(--ease-out);
+}
+.pl-seg[data-filled="true"] .pl-seg-fill { opacity: 1; }
+
+/* Sweep on the connector INTO the active step. */
+.pl-seg[data-sweep="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.85), transparent);
+  animation: pl-sweep-x 1.4s linear infinite;
+}
+@keyframes pl-sweep-x {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+/* Horizontal on md+, vertical below. */
+.pl-rail { display: flex; flex-direction: column; align-items: center; align-self: stretch; }
+.pl-seg { width: 0.25rem; min-height: 0.75rem; }
+@media (min-width: 48rem) {
+  .pl-rail { flex-direction: row; align-self: auto; width: 100%; }
+  .pl-seg { width: auto; height: 0.25rem; min-height: 0; }
+}
+@media (max-width: 47.99rem) {
+  .pl-seg[data-sweep="true"]::after {
+    background: linear-gradient(180deg, transparent, rgb(255 255 255 / 0.85), transparent);
+    animation-name: pl-sweep-y;
+  }
+}
+@keyframes pl-sweep-y {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(100%); }
+}
+
+/* ---- Failure panel: opacity + translateY(6px), 200ms ease-out. No shake. ---- */
+.pl-panel {
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
+}
+@starting-style {
+  .pl-panel { opacity: 0; transform: translateY(6px); }
+}
+
+/* ---- Buttons: press feedback; hover only for real pointers. ---- */
+.pl-btn {
+  transition:
+    transform 120ms var(--ease-out),
+    background-color 150ms ease,
+    opacity 150ms ease;
+}
+.pl-btn:active:not(:disabled) { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) {
+  .pl-btn:hover:not(:disabled) { filter: brightness(1.08); }
+}
+
+/* ---- Reduced motion: keep opacity, drop scale/translate/sweeps. ---- */
+@media (prefers-reduced-motion: reduce) {
+  .pl-dot[data-state="active"] { transform: none; }
+  .pl-node[data-state="active"]::before {
+    animation: pl-fade 1.6s ease-in-out infinite;
+    transform: none;
+    opacity: 0.6;
+  }
+  .pl-seg[data-sweep="true"]::after { display: none; }
+  .pl-pop { animation-name: pl-fade-in; }
+  .pl-panel { transition-property: opacity; }
+  @starting-style { .pl-panel { transform: none; } }
+  .pl-btn:active:not(:disabled) { transform: none; }
+}
+@keyframes pl-fade { 0%, 100% { opacity: 0.2; } 50% { opacity: 0.7; } }
+@keyframes pl-fade-in { from { opacity: 0; } }

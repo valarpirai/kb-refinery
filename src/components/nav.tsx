@@ -4,6 +4,7 @@ import type { SessionUser } from "@/lib/session";
 
 const links = [
   { href: "/", label: "Home" },
+  { href: "/articles", label: "Articles" },
   { href: "/chat", label: "Chat" },
   { href: "/jobs", label: "Jobs" },
   { href: "/import", label: "Import" },

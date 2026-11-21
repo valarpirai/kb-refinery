@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PipelineTunnel } from "@/components/pipeline-tunnel";
 import { ContentViewer, type Version } from "@/components/content-viewer";
 import { ScoreChart } from "@/components/score-chart";
 import { StatusPill } from "@/components/status-pill";
 import { db } from "@/lib/db";
 import { label, severityClass } from "@/lib/format";
+import { getPipelineStatus } from "@/lib/pipeline/status";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,7 @@ export default async function AnalysisPage({ params }: { params: Promise<{ id: s
     content: byType(t)!.content,
     format: t === "raw" ? analysis.article.format : "md",
   }));
+  const pipeline = await getPipelineStatus(analysis.articleId);
   const groups = (["high", "medium", "low"] as const).map((sev) => ({ sev, items: analysis.findings.filter((f) => (f.severity ?? "medium") === sev) }));
 
   return (
@@ -56,6 +59,13 @@ export default async function AnalysisPage({ params }: { params: Promise<{ id: s
         </p>
         {analysis.standardizedSummary && <p className="mt-3 text-sm">{analysis.standardizedSummary}</p>}
       </div>
+
+      {pipeline && (
+        <section aria-labelledby="pipeline">
+          <h2 id="pipeline" className="mb-3 text-lg font-medium">Pipeline</h2>
+          <PipelineTunnel articleId={analysis.articleId} initial={pipeline} />
+        </section>
+      )}
 
       <section aria-labelledby="scores">
         <h2 id="scores" className="mb-3 text-lg font-medium">Scores</h2>
