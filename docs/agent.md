@@ -45,6 +45,16 @@ When the job ends, you get a notification. See `notifications.md`.
 - Crawling is polite and small: same site only, up to 50 pages, one request at a time. The server fetches any URL you give it, including addresses on your network. Only people you trust should have an account.
 - A crawl reads pages as HTML. Pages built by JavaScript in the browser come back mostly empty.
 
+## Agent usage
+
+**Agent usage** in the top bar shows how much the agent runs. Pick a time range: 24 hours, 7 days, 30 days or all time.
+
+- Tiles: runs, success rate, tool calls with the error share, average run time and total tokens.
+- Runs per day.
+- Per tool: calls, errors and average time.
+
+Admins see everyone's chats. Other users see their own. Counts come from the saved chat replies. Tokens and run time come from the stored traces. Code: `src/lib/agent/usage.ts` and `src/app/(app)/agents/page.tsx`.
+
 ## Traces
 
 Every agent run is traced with Traceloop (OpenLLMetry). A trace shows each model call, each tool call, the time and the tokens.
@@ -60,6 +70,7 @@ To also send them to Traceloop Cloud, set `TRACELOOP_API_KEY`. To send them to a
 Admins see **Traces** in the top bar.
 
 - The list shows agent runs, newest first. Filter by time, status, tool used, minimum time and text in prompts or answers. "All traces" adds queue and worker spans.
+- **Span time by kind** shows p50, p90, p95 and p99 for each kind of span in the chosen time range. The other filters do not change it.
 - Open a trace for a timeline. Each span has a colored kind: agent run, loop cycle, model call, tool call, chat request, worker. Open a span to read the prompt, the answer or the tool input.
 - In chat, an agent reply shows **View trace** when you are an admin.
 

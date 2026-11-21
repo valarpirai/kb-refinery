@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Prisma } from "@/generated/prisma/client";
 import { formatDuration } from "@/lib/agent/trace-format";
+import { getKindLatency } from "@/lib/agent/trace-latency";
 import { SPAN_KIND, spanKind, type SpanKind } from "@/lib/colors";
 import { db } from "@/lib/db";
 import { requirePageUser } from "@/lib/session";
@@ -17,7 +18,18 @@ const RANGES = [
   { value: "all", label: "All time", ms: 0 },
 ] as const;
 
-type Params = { type?: string; range?: string; status?: string; tool?: string; q?: string; min?: string; page?: string };
+type Params = { type?: string; range?: string; status?: string; tool?: string; q?: string; min?: string; page?: string; sort?: string; dir?: string };
+
+/** Sortable columns. Each maps to an expression over the aggregated rows. Never built from user text. */
+const SORTS = {
+  started: "started",
+  time: "COALESCE(agent_ms, total_ms)",
+  model_calls: "model_calls",
+  tools: "tools",
+  tokens: "tokens",
+  status: "errors",
+} as const;
+type SortKey = keyof typeof SORTS;
 
 interface Row {
   traceId: string;
@@ -49,6 +61,8 @@ export default async function TracesPage({ searchParams }: { searchParams: Promi
   const tool = (p.tool ?? "").trim();
   const minSeconds = Math.max(0, Number(p.min) || 0);
   const page = Math.max(1, Math.floor(Number(p.page) || 1));
+  const sort: SortKey = (p.sort && p.sort in SORTS ? p.sort : "started") as SortKey;
+  const dir = p.dir === "asc" ? "asc" : "desc";
 
   const since = range.ms ? new Date(Date.now() - range.ms) : new Date(0);
   const conditions: Prisma.Sql[] = [Prisma.sql`TRUE`];
@@ -81,20 +95,35 @@ export default async function TracesPage({ searchParams }: { searchParams: Promi
     WHERE "startedAt" >= ${since} ${textFilter}
     GROUP BY "traceId"`;
 
-  const [rows, countRows, toolRows] = await Promise.all([
-    db.$queryRaw<Row[]>`SELECT * FROM (${aggregate}) a WHERE ${where} ORDER BY started DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`,
+  const [rows, countRows, toolRows, latency] = await Promise.all([
+    db.$queryRaw<Row[]>`SELECT * FROM (${aggregate}) a WHERE ${where} ORDER BY ${Prisma.raw(SORTS[sort])} ${Prisma.raw(dir === "asc" ? "ASC" : "DESC")} NULLS LAST, started DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`,
     db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM (${aggregate}) a WHERE ${where}`,
     db.$queryRaw<{ tool: string }[]>`SELECT DISTINCT substr(name, 14) AS tool FROM "TraceSpan" WHERE name LIKE 'execute_tool %' ORDER BY 1`,
+    getKindLatency(since),
   ]);
   const total = countRows[0]?.n ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const link = (n: number) => {
+  const link = (n: number, s: SortKey = sort, d: string = dir) => {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries({ type, range: range.value, status, tool, q, min: minSeconds ? String(minSeconds) : "" })) if (v && v !== "all" && !(k === "type" && v === "agent")) sp.set(k, v);
+    if (s !== "started" || d !== "desc") {
+      sp.set("sort", s);
+      sp.set("dir", d);
+    }
     if (n > 1) sp.set("page", String(n));
     return `/traces${sp.size ? `?${sp}` : ""}`;
   };
+  /** Click a column: sort by it, or flip the direction when it is already the sort. Goes back to page 1. */
+  const sortHref = (key: SortKey) => link(1, key, key === sort ? (dir === "asc" ? "desc" : "asc") : "desc");
+  const header = (key: SortKey, label: string, className: string) => (
+    <th scope="col" aria-sort={key === sort ? (dir === "asc" ? "ascending" : "descending") : "none"} className={className}>
+      <Link href={sortHref(key)} className="inline-flex items-center gap-1 hover:underline">
+        {label}
+        <span aria-hidden="true" className={key === sort ? "" : "opacity-30"}>{key === sort ? (dir === "asc" ? "▲" : "▼") : "↕"}</span>
+      </Link>
+    </th>
+  );
 
   return (
     <div className="space-y-6">
@@ -104,6 +133,12 @@ export default async function TracesPage({ searchParams }: { searchParams: Promi
       </div>
 
       <form method="get" className="flex flex-wrap items-end gap-3 rounded-lg border border-black/10 p-3 dark:border-white/15" aria-label="Filter traces">
+        {sort !== "started" || dir !== "desc" ? (
+          <>
+            <input type="hidden" name="sort" value={sort} />
+            <input type="hidden" name="dir" value={dir} />
+          </>
+        ) : null}
         <div className="flex flex-col gap-1">
           <label htmlFor="type" className="text-xs font-medium">Show</label>
           <select id="type" name="type" defaultValue={type} className={field}>
@@ -144,6 +179,41 @@ export default async function TracesPage({ searchParams }: { searchParams: Promi
         <Link href="/traces" className="px-2 py-1.5 text-sm underline">Reset</Link>
       </form>
 
+      {latency.length > 0 ? (
+        <section aria-labelledby="latency-heading" className="rounded-lg border border-black/10 p-4 dark:border-white/15">
+          <h2 id="latency-heading" className="font-medium">Span time by kind</h2>
+          <p className="mt-0.5 text-xs opacity-60">All spans in the chosen time range. The other filters do not change it.</p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-black/10 text-xs dark:border-white/15">
+                <tr>
+                  <th className="py-2 pr-4 font-medium">Kind</th>
+                  <th className="pr-4 font-medium">Spans</th>
+                  <th className="pr-4 font-medium">p50</th>
+                  <th className="pr-4 font-medium">p90</th>
+                  <th className="pr-4 font-medium">p95</th>
+                  <th className="pr-4 font-medium">p99</th>
+                  <th className="font-medium">Errors</th>
+                </tr>
+              </thead>
+              <tbody>
+                {latency.map((l) => (
+                  <tr key={l.kind} className="border-b border-black/5 last:border-0 dark:border-white/10">
+                    <td className="py-2 pr-4"><span className={`rounded px-1.5 py-0.5 text-xs ${SPAN_KIND[l.kind].colors.soft}`}>{SPAN_KIND[l.kind].label}</span></td>
+                    <td className="pr-4 tabular-nums">{l.spans.toLocaleString()}</td>
+                    <td className="pr-4 tabular-nums">{formatDuration(l.p50)}</td>
+                    <td className="pr-4 tabular-nums">{formatDuration(l.p90)}</td>
+                    <td className="pr-4 tabular-nums">{formatDuration(l.p95)}</td>
+                    <td className="pr-4 tabular-nums">{formatDuration(l.p99)}</td>
+                    <td className="tabular-nums">{l.errors}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm" aria-live="polite">{total} trace{total === 1 ? "" : "s"}</p>
         <ul className="flex flex-wrap gap-2 text-xs" aria-label="Span colors">
@@ -160,13 +230,13 @@ export default async function TracesPage({ searchParams }: { searchParams: Promi
           <table className="w-full text-left text-sm">
             <thead className="border-b border-black/10 dark:border-white/15">
               <tr>
-                <th className="py-2 pr-4">Started</th>
+                {header("started", "Started", "py-2 pr-4")}
                 <th className="pr-4">Trace</th>
-                <th className="pr-4">Time</th>
-                <th className="pr-4">Model calls</th>
-                <th className="pr-4">Tools</th>
-                <th className="pr-4">Tokens</th>
-                <th>Status</th>
+                {header("time", "Time", "pr-4")}
+                {header("model_calls", "Model calls", "pr-4")}
+                {header("tools", "Tools", "pr-4")}
+                {header("tokens", "Tokens", "pr-4")}
+                {header("status", "Status", "")}
               </tr>
             </thead>
             <tbody>
@@ -202,9 +272,9 @@ export default async function TracesPage({ searchParams }: { searchParams: Promi
 
       {pages > 1 && (
         <nav aria-label="Pages" className="flex items-center justify-between text-sm">
-          {page > 1 ? <Link href={link(page - 1)} className="underline">← Newer</Link> : <span className="opacity-40">← Newer</span>}
+          {page > 1 ? <Link href={link(page - 1)} className="underline">← Previous</Link> : <span className="opacity-40">← Previous</span>}
           <span>Page {page} of {pages}</span>
-          {page < pages ? <Link href={link(page + 1)} className="underline">Older →</Link> : <span className="opacity-40">Older →</span>}
+          {page < pages ? <Link href={link(page + 1)} className="underline">Next →</Link> : <span className="opacity-40">Next →</span>}
         </nav>
       )}
     </div>
