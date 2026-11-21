@@ -11,6 +11,7 @@ KB Refinery reads knowledge base articles, finds what is wrong with them, and re
 | [data-model.md](data-model.md) | Every table and what it holds. |
 | [ingestion.md](ingestion.md) | How articles and incidents get in. |
 | [pipeline.md](pipeline.md) | The stages, the LLM calls, and the queue. |
+| [pages.md](pages.md) | What each page shows. |
 
 ## Status
 
@@ -21,7 +22,7 @@ KB Refinery reads knowledge base articles, finds what is wrong with them, and re
 | Bulk upload (MD, HTML, TXT, CSV, JSON) | Done |
 | Pipeline and worker | Done, tested on one article |
 | Jobs API | Done |
-| Pages: home, pipeline, job tracker, report | Not built |
+| Pages: home, jobs, job detail, report | Done. Not checked in a browser. |
 | Integrations page and scheduled pulls | Not built |
 | Chat, ask, eval scorer | Not built |
 

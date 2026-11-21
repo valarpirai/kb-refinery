@@ -1,103 +1,113 @@
-import Image from "next/image";
+import Link from "next/link";
+import { RefinePicker } from "@/components/refine-picker";
+import { StatusPill } from "@/components/status-pill";
+import { db } from "@/lib/db";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+function Tile({ title, value, hint }: { title: string; value: string | number; hint?: string }) {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="rounded-lg border border-black/10 p-4 dark:border-white/15">
+      <p className="text-xs uppercase tracking-wide opacity-70">{title}</p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      {hint && <p className="mt-1 text-xs opacity-70">{hint}</p>}
+    </div>
+  );
+}
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+export default async function Home() {
+  const [articles, ready, openFindings, averages, recent, products] = await Promise.all([
+    db.article.count(),
+    db.analysis.count({ where: { pipelineStage: "ready" } }),
+    db.finding.count({ where: { state: "new", type: { not: "duplicate" } } }),
+    db.snapshot.groupBy({ by: ["type"], _avg: { score: true, llmScore: true } }),
+    db.analysis.findMany({
+      orderBy: { updatedAt: "desc" },
+      take: 10,
+      include: {
+        article: { select: { title: true, knowledgeBase: true } },
+        snapshots: { orderBy: { version: "desc" }, take: 3, select: { type: true, score: true, llmScore: true } },
+        _count: { select: { findings: { where: { state: "new" } } } },
+      },
+    }),
+    db.product.findMany({ where: { articleCount: { gt: 0 } }, orderBy: { articleCount: "desc" }, take: 8 }),
+  ]);
+
+  const avg = (type: string) => averages.find((a) => a.type === type)?._avg.score;
+  const fmt = (n: number | null | undefined) => (n == null ? "–" : Math.round(n));
+  const maxCount = Math.max(1, ...products.map((p) => p.articleCount));
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">KB Refinery</h1>
+          <p className="mt-1 text-sm opacity-70">Find what is wrong with articles. Rewrite them for AI.</p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        <RefinePicker />
+      </div>
+
+      <section aria-label="Summary" className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Tile title="Articles" value={articles} hint={`${ready} refined`} />
+        <Tile title="Open findings" value={openFindings} />
+        <Tile title="Avg score, raw" value={fmt(avg("raw"))} hint="Mechanical, out of 100" />
+        <Tile title="Avg score, rewritten" value={fmt(avg("enriched"))} hint={`Converted: ${fmt(avg("converted"))}`} />
+      </section>
+
+      <section aria-labelledby="recent">
+        <h2 id="recent" className="mb-3 text-lg font-medium">Recent articles</h2>
+        {recent.length === 0 ? (
+          <p className="text-sm opacity-70">Nothing analyzed yet. Import articles, then choose Refine articles.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-black/10 dark:border-white/15">
+                <tr>
+                  <th className="py-2 pr-4">Article</th>
+                  <th className="pr-4">Stage</th>
+                  <th className="pr-4">Raw</th>
+                  <th className="pr-4">Rewritten</th>
+                  <th>Open findings</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recent.map((a) => {
+                  const score = (t: string) => a.snapshots.find((s) => s.type === t)?.score;
+                  return (
+                    <tr key={a.id} className="border-b border-black/5 dark:border-white/10">
+                      <td className="py-2 pr-4">
+                        <Link href={`/analysis/${a.id}`} className="font-medium text-blue-700 hover:underline dark:text-blue-300">{a.article.title}</Link>
+                        <span className="block text-xs opacity-70">{a.article.knowledgeBase}</span>
+                      </td>
+                      <td className="pr-4"><StatusPill status={a.pipelineStage} /></td>
+                      <td className="pr-4">{fmt(score("raw"))}</td>
+                      <td className="pr-4">{fmt(score("enriched"))}</td>
+                      <td>{a._count.findings}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="products">
+        <h2 id="products" className="mb-3 text-lg font-medium">Products mentioned</h2>
+        {products.length === 0 ? (
+          <p className="text-sm opacity-70">No products found yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {products.map((p) => (
+              <li key={p.id} className="flex items-center gap-3 text-sm">
+                <span className="w-40 truncate">{p.name}</span>
+                <span className="h-3 rounded bg-blue-600" style={{ width: `${(p.articleCount / maxCount) * 60}%`, minWidth: "0.5rem" }} aria-hidden="true" />
+                <span>{p.articleCount} article{p.articleCount === 1 ? "" : "s"}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
