@@ -13,6 +13,7 @@ export const TOOL_CATALOG: ToolInfo[] = [
   { name: "get_job_status", label: "Check a job", summary: "Reports a job's status and the count per stage." },
   { name: "get_stats", label: "Look up statistics", summary: "Reports article counts, stages, failed articles, open findings, average scores and top products." },
   { name: "search_articles", label: "Search articles", summary: "Finds articles by title words." },
+  { name: "search_knowledge", label: "Answer from articles", summary: "Searches the refined article text and returns excerpts that answer a question." },
 ];
 
 export const TOOL_NAMES = TOOL_CATALOG.map((t) => t.name);

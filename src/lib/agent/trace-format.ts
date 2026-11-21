@@ -6,7 +6,7 @@
 export function spanLabel(name: string): string {
   if (name.startsWith("invoke_agent")) return "Agent run";
   if (name === "execute_agent_loop_cycle") return "Agent loop cycle";
-  if (name.startsWith("chat ")) return "Model call";
+  if (name === "chat" || name.startsWith("chat ")) return "Model call";
   if (name.startsWith("execute_tool ")) return `Tool: ${name.slice("execute_tool ".length)}`;
   if (name === "kb_refinery.agent_chat") return "Chat request";
   if (name.startsWith("process ")) return `Worker: ${name.slice(8)}`;

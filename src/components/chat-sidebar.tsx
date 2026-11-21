@@ -38,7 +38,7 @@ interface Props {
   conversations: ConversationItem[];
   activeId: string | null;
   tally: Tally;
-  index: IndexStatus;
+  index: IndexStatus | null;
   onNavigate: () => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
@@ -116,7 +116,7 @@ export function ChatSidebar({ conversations, activeId, tally, index, onNavigate,
       </nav>
 
       <div className="chat-side-foot">
-        <p>{index.indexed} of {index.total} refined articles indexed</p>
+        <p>{index ? `${index.indexed} of ${index.total} refined articles indexed` : "Loading index status…"}</p>
         <ReindexButton />
         <dl aria-label="Your verdicts" className="chat-tally">
           {([["Refined better", tally.refined], ["Original better", tally.original], ["Same", tally.tie], ["Neither", tally.neither]] as const).map(([k, v]) => (

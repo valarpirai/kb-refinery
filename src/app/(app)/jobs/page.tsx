@@ -5,7 +5,8 @@ import { db } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export default async function JobsPage() {
-  const jobs = await db.job.findMany({ orderBy: { createdAt: "desc" }, take: 50 });
+  // Take the 50 newest, then show them oldest first.
+  const jobs = (await db.job.findMany({ orderBy: { createdAt: "desc" }, take: 50 })).reverse();
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Jobs</h1>

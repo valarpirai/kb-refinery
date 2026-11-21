@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
+import { AUTO_AGENT_SLUG, DEFAULT_AGENT_SLUG } from "@/lib/agent/slugs";
 import { AGENT_QUEUE, getBoss } from "@/lib/queue";
 
-/** The agent used when none is chosen, including uploads and scheduled pulls. */
-export const DEFAULT_AGENT_SLUG = "refinery";
+export { DEFAULT_AGENT_SLUG };
 
 /**
  * Add a user message to an agent conversation, create the pending reply, and queue the agent.
@@ -10,7 +10,7 @@ export const DEFAULT_AGENT_SLUG = "refinery";
  * @param userId the owner
  * @param text what the user said
  * @param opts.conversationId an existing conversation of this user. It keeps the agent it started with.
- * @param opts.agentSlug the agent for a new conversation; defaults to the refinery agent
+ * @param opts.agentSlug the agent for a new conversation; defaults to the refinery agent. "auto" lets the router pick for each message.
  * @param opts.title title for a new conversation
  * @return ids the page needs to show and poll the reply
  */
@@ -21,7 +21,7 @@ export async function startAgentTurn(userId: string, text: string, opts: { conve
     if (!found) throw new Error("Conversation not found");
   } else {
     const agentSlug = opts.agentSlug ?? DEFAULT_AGENT_SLUG;
-    if (!(await db.agent.findUnique({ where: { slug: agentSlug }, select: { id: true } }))) throw new Error("Agent not found");
+    if (agentSlug !== AUTO_AGENT_SLUG && !(await db.agent.findUnique({ where: { slug: agentSlug }, select: { id: true } }))) throw new Error("Agent not found");
     const title = opts.title ?? (text.length > 60 ? `${text.slice(0, 57)}…` : text);
     conversationId = (await db.conversation.create({ data: { userId, title, agentSlug } })).id;
   }

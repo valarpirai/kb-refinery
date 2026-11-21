@@ -1,8 +1,10 @@
 import { Agent } from "@strands-agents/sdk";
-import { OpenAIModel } from "@strands-agents/sdk/models/openai";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { makeModel } from "./model";
+import { routeAgent } from "./router";
+import { AUTO_AGENT_SLUG } from "./slugs";
 import { buildTools } from "./tools";
 
 const FLUSH_MS = 400;
@@ -28,16 +30,6 @@ type StreamEvent = {
   // The live object has these fields directly; its JSON form wraps them in `toolResult`.
   result?: ToolResultShape & { toolResult?: ToolResultShape };
 };
-
-/** The model, pointed at Ollama's OpenAI-compatible endpoint. */
-function makeModel() {
-  return new OpenAIModel({
-    api: "chat",
-    modelId: process.env.OLLAMA_MODEL ?? "qwen3:4b-thinking-2507-q4_K_M",
-    apiKey: "ollama",
-    clientConfig: { baseURL: `${process.env.OLLAMA_BASE_URL ?? "http://localhost:11434"}/v1` },
-  });
-}
 
 /**
  * Run the agent for one assistant message and stream its progress into the database.
@@ -79,11 +71,15 @@ export async function runAgentMessage(assistantId: string): Promise<void> {
 
     try {
       // Read the agent on every run, so a saved edit applies to the next message. The prompt was built when it was saved.
-      const slug = message.conversation.agentSlug;
+      // "auto" conversations pick an agent for each message. The pick is saved on the reply.
+      const chosen = message.conversation.agentSlug;
+      const slug = chosen === AUTO_AGENT_SLUG ? await routeAgent(last.content) : chosen;
+      await db.chatMessage.update({ where: { id: assistantId }, data: { agentSlug: slug } });
       const config = await db.agent.findUnique({ where: { slug } });
       if (!config) throw new Error(`Agent "${slug}" does not exist. Pick another agent or run pnpm db:seed.`);
       if (!config.prompt.trim()) throw new Error(`Agent "${slug}" has no prompt yet. Open it on the Agents page and save.`);
       const agent = new Agent({
+        name: config.name,
         model: makeModel(),
         tools: buildTools({ userId: message.conversation.userId }, config.tools),
         systemPrompt: config.prompt,

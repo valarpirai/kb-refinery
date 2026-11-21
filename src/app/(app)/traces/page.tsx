@@ -24,6 +24,7 @@ type Params = { type?: string; range?: string; status?: string; tool?: string; q
 const SORTS = {
   started: "started",
   time: "COALESCE(agent_ms, total_ms)",
+  agents: "agents",
   model_calls: "model_calls",
   tools: "tools",
   tokens: "tokens",
@@ -37,6 +38,7 @@ interface Row {
   spans: number;
   errors: number;
   tools: number;
+  agents: number;
   model_calls: number;
   agent_ms: number | null;
   total_ms: number;
@@ -83,10 +85,11 @@ export default async function TracesPage({ searchParams }: { searchParams: Promi
       count(*)::int AS spans,
       (count(*) FILTER (WHERE status = 'error'))::int AS errors,
       (count(*) FILTER (WHERE name LIKE 'execute_tool %'))::int AS tools,
-      (count(*) FILTER (WHERE name LIKE 'chat %'))::int AS model_calls,
+      (count(*) FILTER (WHERE name = 'chat' OR name LIKE 'chat %'))::int AS model_calls,
+      (count(*) FILTER (WHERE name LIKE 'invoke_agent%'))::int AS agents,
       max("durationMs") FILTER (WHERE name LIKE 'invoke_agent%') AS agent_ms,
       max("durationMs") AS total_ms,
-      max((attributes->>'gen_ai.usage.total_tokens')::numeric) FILTER (WHERE name LIKE 'invoke_agent%') AS tokens,
+      sum((attributes->>'gen_ai.usage.total_tokens')::numeric) FILTER (WHERE name LIKE 'invoke_agent%') AS tokens,
       COALESCE(bool_or(name LIKE 'invoke_agent%'), false) AS is_agent,
       max(attributes->>'kb.conversation_id') AS conversation_id,
       array_remove(array_agg(DISTINCT substr(name, 14)) FILTER (WHERE name LIKE 'execute_tool %'), NULL) AS tool_names,
@@ -233,6 +236,7 @@ export default async function TracesPage({ searchParams }: { searchParams: Promi
                 {header("started", "Started", "py-2 pr-4")}
                 <th className="pr-4">Trace</th>
                 {header("time", "Time", "pr-4")}
+                {header("agents", "Agents", "pr-4")}
                 {header("model_calls", "Model calls", "pr-4")}
                 {header("tools", "Tools", "pr-4")}
                 {header("tokens", "Tokens", "pr-4")}
@@ -255,6 +259,7 @@ export default async function TracesPage({ searchParams }: { searchParams: Promi
                     </span>
                   </td>
                   <td className="pr-4 whitespace-nowrap">{formatDuration(r.agent_ms ?? r.total_ms)}</td>
+                  <td className="pr-4">{r.agents}</td>
                   <td className="pr-4">{r.model_calls}</td>
                   <td className="pr-4">{r.tools}</td>
                   <td className="pr-4">{r.tokens != null ? Number(r.tokens).toLocaleString() : "–"}</td>

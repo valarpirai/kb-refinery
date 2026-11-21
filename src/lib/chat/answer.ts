@@ -8,6 +8,9 @@ import { embed, toVectorLiteral } from "./embed";
 
 const TOP_K = 5;
 
+/** Chunks scoring below this are treated as unrelated. Relevant hits score about 0.75 to 0.85 with nomic-embed-text. */
+export const MIN_SCORE = 0.6;
+
 export interface Source {
   n: number;
   articleId: string;
@@ -22,17 +25,18 @@ export interface Source {
  * Find the chunks closest to a question within one variant.
  * @param variant original or refined
  * @param vector the question embedding
+ * @param minScore drop chunks scoring below this; defaults to keeping all five
  * @return up to five sources, best first, numbered from 1
  */
-async function retrieve(variant: "original" | "refined", vector: number[]): Promise<Source[]> {
+export async function retrieve(variant: "original" | "refined", vector: number[], minScore = 0): Promise<Source[]> {
   const rows = await db.$queryRaw<{ articleId: string; analysisId: string | null; title: string; heading: string | null; content: string; score: number }[]>`
     SELECT c."articleId", an.id AS "analysisId", a.title, c.heading, c.content, 1 - (c.embedding <=> ${toVectorLiteral(vector)}::vector) AS score
     FROM "Chunk" c JOIN "Article" a ON a.id = c."articleId"
     LEFT JOIN "Analysis" an ON an."articleId" = a.id
-    WHERE c.variant = ${variant}::"ChunkVariant" AND c.embedding IS NOT NULL
+    WHERE an."pipelineStage" = 'ready' AND c.variant = ${variant}::"ChunkVariant" AND c.embedding IS NOT NULL
     ORDER BY c.embedding <=> ${toVectorLiteral(vector)}::vector
     LIMIT ${TOP_K}`;
-  return rows.map((r, i) => ({ n: i + 1, articleId: r.articleId, analysisId: r.analysisId, title: r.title, heading: r.heading, score: Number(r.score), excerpt: r.content }));
+  return rows.filter((r) => Number(r.score) >= minScore).map((r, i) => ({ n: i + 1, articleId: r.articleId, analysisId: r.analysisId, title: r.title, heading: r.heading, score: Number(r.score), excerpt: r.content }));
 }
 
 /** Render sources the way the prompts expect them. */

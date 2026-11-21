@@ -7,34 +7,29 @@ import { ChatComposer } from "@/components/chat-composer";
 import { ChatEmpty } from "@/components/chat-empty";
 import { ChatSidebar } from "@/components/chat-sidebar";
 import { ChatTurn, isBusy } from "@/components/chat-turn";
-import type { AgentOption, ChatMessageData, ChatMode, ComparisonData, ConversationData, ConversationItem, IndexStatus, Tally } from "@/app/(app)/chat/types";
+import { AUTO_AGENT_SLUG } from "@/lib/agent/slugs";
+import type { ChatMessageData, ComparisonData, ConversationData, ConversationItem, IndexStatus, Tally } from "@/app/(app)/chat/types";
 
 interface Props {
   userName: string;
   isAdmin: boolean;
   initialConversations: ConversationItem[];
-  initialActive: ConversationData | null;
-  initialTally: Tally;
-  agents: AgentOption[];
-  index: IndexStatus;
 }
 
 /** Sidebar, conversation and composer. Server props seed the state; after mount the client owns it. */
-export function ChatShell({ userName, isAdmin, initialConversations, initialActive, initialTally, agents, index }: Props) {
+export function ChatShell({ userName, isAdmin, initialConversations }: Props) {
   const router = useRouter();
   const activeId = useSearchParams().get("c");
 
   const [conversations, setConversations] = useState(initialConversations);
-  const [active, setActive] = useState<ConversationData | null>(initialActive);
-  const [tally, setTally] = useState(initialTally);
+  const [active, setActive] = useState<ConversationData | null>(null);
+  const [tally, setTally] = useState<Tally>({ original: 0, refined: 0, tie: 0, neither: 0 })
+  const [index, setIndex] = useState<IndexStatus | null>(null);
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<ChatMode>("agent");
-  const [pickedAgent, setPickedAgent] = useState(agents.find((a) => a.slug === "refinery")?.slug ?? agents[0]?.slug ?? "");
-  const [blind, setBlind] = useState(true);
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drawer, setDrawer] = useState(false);
-  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(activeId);
   const [prevActiveId, setPrevActiveId] = useState(activeId);
   const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
 
@@ -57,6 +52,22 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
       setLoadingId(activeId);
     }
   }
+
+  // Index progress and verdict totals load after first paint.
+  useEffect(() => {
+    let live = true;
+    fetch("/api/chat/status", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { tally: Tally; index: IndexStatus } | null) => {
+        if (!live || !data) return;
+        setTally(data.tally);
+        setIndex(data.index);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!loadingId) return;
@@ -143,10 +154,6 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
     : []
   ).map((x) => x.item);
 
-  // A conversation keeps the agent it started with. The picker only works before the first message.
-  const agentLocked = (active?.messages.length ?? 0) > 0;
-  const agentSlug = agentLocked && active ? active.agentSlug : pickedAgent;
-
   const busy = asking || (active?.messages.some(isAgentBusy) ?? false) || (active?.comparisons.some(isBusy) ?? false);
 
   async function sendAgent(text: string) {
@@ -155,7 +162,7 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
     setError(null);
     setAsking(true);
     try {
-      const res = await fetch("/api/agent/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: q, conversationId: active?.id, agentSlug: pickedAgent || undefined }) });
+      const res = await fetch("/api/agent/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: q, conversationId: active?.id, agentSlug: AUTO_AGENT_SLUG }) });
       const json = (await res.json()) as { conversationId?: string; userMessageId?: string; assistantMessageId?: string; error?: string };
       if (!res.ok || !json.conversationId || !json.userMessageId || !json.assistantMessageId) return setError(json.error ?? "Could not send");
       const convId = json.conversationId;
@@ -167,7 +174,7 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
       setQuery("");
       setFresh((f) => new Set(f).add(userMsg.id).add(botMsg.id));
       scrollToRef.current = userMsg.id;
-      setActive((a) => (a && a.id === convId ? { ...a, messages: [...a.messages, userMsg, botMsg] } : { id: convId, title: q.slice(0, 80), agentSlug: pickedAgent, comparisons: [], messages: [userMsg, botMsg] }));
+      setActive((a) => (a && a.id === convId ? { ...a, messages: [...a.messages, userMsg, botMsg] } : { id: convId, title: q.slice(0, 80), agentSlug: AUTO_AGENT_SLUG, comparisons: [], messages: [userMsg, botMsg] }));
       if (isNew) router.replace(`/chat?c=${convId}`, { scroll: false });
       void refreshList();
     } catch {
@@ -184,31 +191,8 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
     if (user) void sendAgent(user.content);
   }
 
-  async function ask() {
-    if (mode === "agent") return sendAgent(query);
-    const q = query.trim();
-    if (q.length < 3 || busy) return;
-    setError(null);
-    setAsking(true);
-    try {
-      const res = await fetch("/api/compare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q, conversationId: active?.id }) });
-      const json = (await res.json()) as { id?: string; conversationId?: string; error?: string };
-      if (!res.ok || !json.id || !json.conversationId) return setError(json.error ?? "Could not ask");
-      const full = (await fetch(`/api/compare/${json.id}`, { cache: "no-store" }).then((r) => r.json())) as ComparisonData;
-      const convId = json.conversationId;
-      const next = { ...full, conversationId: convId };
-      const isNew = activeRef.current?.id !== convId;
-      setQuery("");
-      setFresh((f) => new Set(f).add(next.id));
-      scrollToRef.current = next.id;
-      setActive((a) => (a && a.id === convId ? { ...a, comparisons: [...a.comparisons, next] } : { id: convId, title: q.slice(0, 80), agentSlug: pickedAgent, comparisons: [next], messages: [] }));
-      if (isNew) router.replace(`/chat?c=${convId}`, { scroll: false });
-      void refreshList();
-    } catch {
-      setError("Could not reach the server. Try again.");
-    } finally {
-      setAsking(false);
-    }
+  function ask() {
+    void sendAgent(query);
   }
 
   async function rename(id: string, title: string) {
@@ -269,7 +253,7 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
             ) : thread.length > 0 ? (
               thread.map((t) =>
                 t.kind === "compare" ? (
-                  <ChatTurn key={t.cmp.id} cmp={t.cmp} blind={blind} fresh={fresh.has(t.cmp.id)} onChange={updateComparison} />
+                  <ChatTurn key={t.cmp.id} cmp={t.cmp} blind={false} fresh={fresh.has(t.cmp.id)} onChange={updateComparison} />
                 ) : t.msg.role === "user" ? (
                   <ChatUserMessage key={t.msg.id} msg={t.msg} fresh={fresh.has(t.msg.id)} />
                 ) : (
@@ -277,12 +261,12 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
                 ),
               )
             ) : (
-              <ChatEmpty name={userName} mode={mode} onPick={pick} />
+              <ChatEmpty name={userName} onPick={pick} />
             )}
           </div>
         </div>
 
-        <ChatComposer query={query} onQuery={setQuery} onSend={ask} busy={busy} mode={mode} onMode={setMode} agents={agents} agentSlug={agentSlug} onAgent={setPickedAgent} agentLocked={agentLocked} blind={blind} onBlind={setBlind} error={error} inputRef={inputRef} />
+        <ChatComposer query={query} onQuery={setQuery} onSend={ask} busy={busy} error={error} inputRef={inputRef} />
       </section>
     </div>
   );

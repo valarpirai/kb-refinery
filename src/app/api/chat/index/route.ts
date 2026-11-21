@@ -10,10 +10,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   if (!(await getUser())) return unauthorized();
   const [articles, byVariant] = await Promise.all([
-    db.chunk.findMany({ distinct: ["articleId"], select: { articleId: true } }),
+    db.$queryRaw<{ n: bigint }[]>`SELECT count(DISTINCT "articleId") AS n FROM "Chunk"`,
     db.chunk.groupBy({ by: ["variant"], _count: true }),
   ]);
-  return NextResponse.json({ articles: articles.length, chunks: Object.fromEntries(byVariant.map((v) => [v.variant, v._count])) });
+  return NextResponse.json({ articles: Number(articles[0]?.n ?? 0), chunks: Object.fromEntries(byVariant.map((v) => [v.variant, v._count])) });
 }
 
 /** POST: queue a rebuild of the whole index. */

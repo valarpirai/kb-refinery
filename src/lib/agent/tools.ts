@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { runImport } from "@/lib/ingest/import";
 import { createJob } from "@/lib/pipeline/jobs";
 import { listFailedItems, restartJobItem } from "@/lib/pipeline/restart";
+import { MIN_SCORE, retrieve } from "@/lib/chat/answer";
+import { embed } from "@/lib/chat/embed";
 import { crawl } from "./crawl";
 
 export interface ToolContext {
@@ -174,6 +176,17 @@ export function buildTools(ctx: ToolContext, enabled?: string[]) {
     },
   });
 
-  const all = [importFromUrl, startRefine, restartFailed, jobStatus, getStats, searchArticles];
+  const searchKnowledge = tool({
+    name: "search_knowledge",
+    description: "Search the refined article text for passages that answer a question. Returns numbered excerpts with article titles. Answer only from these excerpts and cite the numbers. An empty list means no article is relevant.",
+    inputSchema: z.object({ question: z.string().min(3).describe("The question rewritten to stand alone. Replace words like it, that or and on mac with what they refer to, using the conversation so far.") }),
+    callback: async ({ question }) => {
+      const [vector] = await embed([question], "query");
+      const sources = await retrieve("refined", vector, MIN_SCORE);
+      return json(sources.map((s) => ({ n: s.n, article_id: s.articleId, title: s.title, heading: s.heading, relevance: Number(s.score.toFixed(2)), excerpt: s.excerpt })));
+    },
+  });
+
+  const all = [importFromUrl, startRefine, restartFailed, jobStatus, getStats, searchArticles, searchKnowledge];
   return enabled ? all.filter((t) => enabled.includes(t.name)) : all;
 }

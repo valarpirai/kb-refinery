@@ -579,7 +579,7 @@ model Conversation {
   id        String   @id @default(cuid())
   userId    String
   title     String
-  agentSlug String   @default("refinery") // which Agent answers in this conversation
+  agentSlug String   @default("refinery") // which Agent answers in this conversation, or "auto" to let the router pick for each message
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -632,6 +632,7 @@ model ChatMessage {
   toolCalls      Json          @default("[]") // [{ id, name, input, output, status, startedAt, endedAt }]
   error          String?
   traceId        String?
+  agentSlug      String? // the agent that wrote this reply. Set when the reply starts.
   createdAt      DateTime      @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
