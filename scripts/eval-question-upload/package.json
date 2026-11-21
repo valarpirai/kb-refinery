@@ -1,0 +1,17 @@
+{
+  "name": "eval-question-upload",
+  "version": "0.0.1",
+  "private": true,
+  "description": "One-time local script: uploads eval-question CSV exports to x_snc_kb_refinery_eval_question via the Eval Question Upload REST API.",
+  "type": "module",
+  "main": "upload.mjs",
+  "scripts": {
+    "upload": "node upload.mjs"
+  },
+  "dependencies": {
+    "csv-parse": "^5.5.6"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
