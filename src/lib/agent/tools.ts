@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { runImport } from "@/lib/ingest/import";
 import { createJob } from "@/lib/pipeline/jobs";
 import { listFailedItems, restartJobItem } from "@/lib/pipeline/restart";
+import { normalizeTag } from "@/lib/tags";
 import { MIN_SCORE, retrieve } from "@/lib/chat/retrieve";
 import { embed } from "@/lib/chat/embed";
 import { crawl } from "./crawl";
@@ -19,6 +20,18 @@ function slugFor(url: string): string {
 }
 
 const json = (value: unknown) => JSON.stringify(value);
+
+/**
+ * Find the known products a question names, by product name or alias.
+ * @param question the user's question
+ * @return the names of matching products
+ */
+async function productsIn(question: string): Promise<string[]> {
+  const text = question.toLowerCase();
+  const products = await db.product.findMany({ select: { name: true, aliases: true } });
+  const named = (term: string) => term.trim().length >= 2 && new RegExp(`(^|[^a-z0-9])${term.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(text);
+  return products.filter((p) => [p.name, ...p.aliases.split(",")].some(named)).map((p) => p.name);
+}
 
 /**
  * The tools the refinery agent can call. Each one is bound to the signed-in user.
@@ -178,12 +191,21 @@ export function buildTools(ctx: ToolContext, enabled?: string[]) {
 
   const searchKnowledge = tool({
     name: "search_knowledge",
-    description: "Search the refined article text for passages that answer a question. Returns numbered excerpts with article titles. Answer only from these excerpts and cite the numbers. An empty list means no article is relevant.",
+    description: "Search the refined article text for passages that answer a question. Returns numbered excerpts with article titles. Answer only from these excerpts and cite the numbers. An empty excerpts list means no article is relevant. Products named in the question narrow the search to articles tagged with them.",
     inputSchema: z.object({ question: z.string().min(3).describe("The question rewritten to stand alone. Replace words like it, that or and on mac with what they refer to, using the conversation so far.") }),
     callback: async ({ question }) => {
       const [vector] = await embed([question], "query");
-      const sources = await retrieve("refined", vector, question, MIN_SCORE);
-      return json(sources.map((s) => ({ n: s.n, article_id: s.articleId, title: s.title, heading: s.heading, relevance: Number(s.score.toFixed(2)), excerpt: s.excerpt })));
+      // Products named in the question narrow the search to articles tagged with them. No match there: search everything.
+      const products = await productsIn(question);
+      const tags = products.flatMap((p) => normalizeTag(p) ?? []);
+      let sources = tags.length > 0 ? await retrieve("refined", vector, question, MIN_SCORE, tags) : [];
+      const narrowed = sources.length > 0;
+      if (!narrowed) sources = await retrieve("refined", vector, question, MIN_SCORE);
+      return json({
+        products_in_question: products,
+        searched_only_articles_about_them: narrowed,
+        excerpts: sources.map((s) => ({ n: s.n, article_id: s.articleId, title: s.title, heading: s.heading, relevance: Number(s.score.toFixed(2)), excerpt: s.excerpt })),
+      });
     },
   });
 

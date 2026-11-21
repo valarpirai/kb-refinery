@@ -1,3 +1,4 @@
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { toVectorLiteral } from "./embed";
 
@@ -50,15 +51,17 @@ export function keywordQuery(question: string): string {
  * @param vector the question embedding
  * @param question the question text, for the keyword search
  * @param minScore drop vector hits scoring below this; defaults to keeping all
+ * @param tags when given, only articles carrying at least one of these tags are searched
  * @return up to five sources, best first, numbered from 1. Score is the cosine similarity.
  */
-export async function retrieve(variant: "original" | "refined", vector: number[], question: string, minScore = 0): Promise<Source[]> {
+export async function retrieve(variant: "original" | "refined", vector: number[], question: string, minScore = 0, tags: string[] = []): Promise<Source[]> {
   const lit = toVectorLiteral(vector);
+  const tagged = tags.length === 0 ? Prisma.empty : Prisma.sql`AND EXISTS (SELECT 1 FROM "ArticleTag" at JOIN "Tag" t ON t.id = at."tagId" WHERE at."articleId" = c."articleId" AND t.name = ANY(${tags}::text[]))`;
   const byVector = await db.$queryRaw<Row[]>`
     SELECT c.id, c."articleId", an.id AS "analysisId", a.title, c.heading, c.content, 1 - (c.embedding <=> ${lit}::vector) AS score
     FROM "Chunk" c JOIN "Article" a ON a.id = c."articleId"
     JOIN "Analysis" an ON an."articleId" = a.id
-    WHERE an."pipelineStage" = 'ready' AND c.variant = ${variant}::"ChunkVariant" AND c.embedding IS NOT NULL
+    WHERE an."pipelineStage" = 'ready' AND c.variant = ${variant}::"ChunkVariant" AND c.embedding IS NOT NULL ${tagged}
     ORDER BY c.embedding <=> ${lit}::vector
     LIMIT ${POOL}`;
 
@@ -68,7 +71,7 @@ export async function retrieve(variant: "original" | "refined", vector: number[]
         SELECT c.id, c."articleId", an.id AS "analysisId", a.title, c.heading, c.content, 1 - (c.embedding <=> ${lit}::vector) AS score
         FROM "Chunk" c JOIN "Article" a ON a.id = c."articleId"
         JOIN "Analysis" an ON an."articleId" = a.id
-        WHERE an."pipelineStage" = 'ready' AND c.variant = ${variant}::"ChunkVariant" AND c.embedding IS NOT NULL
+        WHERE an."pipelineStage" = 'ready' AND c.variant = ${variant}::"ChunkVariant" AND c.embedding IS NOT NULL ${tagged}
           AND to_tsvector('english', c.content) @@ to_tsquery('english', ${q})
         ORDER BY ts_rank_cd(to_tsvector('english', c.content), to_tsquery('english', ${q})) DESC
         LIMIT ${POOL}`

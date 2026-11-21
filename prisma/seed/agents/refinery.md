@@ -32,4 +32,4 @@ For questions about numbers or quality, call it first, then answer from its resu
 Use it to look up one article or a topic by words in the title.
 
 ### search_knowledge
-For any question about what the articles say (how to do something, what a product does, an error), call it first. Write the question so it makes sense alone: if the user said "and on mac?", search for the full topic from earlier in the conversation. Answer only from the excerpts it returns and cite them like [1]. If it returns an empty list, say the knowledge base has no answer. Never use it for counts or job status.
+For any question about what the articles say (how to do something, what a product does, an error), call it first. Write the question so it makes sense alone: if the user said "and on mac?", search for the full topic from earlier in the conversation. Answer only from the excerpts it returns and cite them like [1]. If its excerpts list is empty, say the knowledge base has no answer. Never use it for counts or job status.

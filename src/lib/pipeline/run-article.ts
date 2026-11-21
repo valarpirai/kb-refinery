@@ -5,6 +5,7 @@ import { toMarkdown } from "./convert";
 import { formatFindings, formatIncidents, jsonOrNone } from "./format";
 import { findCandidateIncidents } from "./incidents";
 import { chatJson } from "./llm";
+import { MAX_TAGS_PER_ARTICLE, normalizeTag } from "@/lib/tags";
 import { renderPrompt } from "./prompts";
 import { analysisSchema, CONTENT_GAP_TYPES, duplicateSchema, enrichmentSchema, scoreOnlySchema, synthesisSchema, type AnalysisResult } from "./schemas";
 import { scoreContent } from "./scorer";
@@ -94,9 +95,38 @@ async function productFor(name: string) {
   return found ?? db.product.create({ data: { name: clean } });
 }
 
-/** Replace an article's product mentions and refresh the affected counters. */
+/**
+ * Keep an article's tags in step with the products it mentions.
+ * Each mentioned product becomes a tag. A tag for a product the article no longer mentions is removed.
+ * Tags a person added by hand stay, unless they match a product that dropped out.
+ * @param analysisId the analysis whose article is tagged
+ * @param before product names mentioned before this run
+ * @param after product names mentioned now
+ */
+async function syncProductTags(analysisId: string, before: string[], after: string[]) {
+  const analysis = await db.analysis.findUnique({ where: { id: analysisId }, select: { articleId: true } });
+  if (!analysis) return;
+  const { articleId } = analysis;
+  const wanted = new Set(after.flatMap((n) => normalizeTag(n) ?? []));
+  const stale = before.flatMap((n) => normalizeTag(n) ?? []).filter((n) => !wanted.has(n));
+  if (stale.length > 0) {
+    const tags = await db.tag.findMany({ where: { name: { in: stale } }, select: { id: true } });
+    await db.articleTag.deleteMany({ where: { articleId, tagId: { in: tags.map((t) => t.id) } } });
+    await db.tag.deleteMany({ where: { id: { in: tags.map((t) => t.id) }, articles: { none: {} } } });
+  }
+  let room = MAX_TAGS_PER_ARTICLE - (await db.articleTag.count({ where: { articleId } }));
+  for (const name of wanted) {
+    const tag = await db.tag.upsert({ where: { name }, create: { name }, update: {} });
+    if (await db.articleTag.findUnique({ where: { articleId_tagId: { articleId, tagId: tag.id } } })) continue;
+    if (room <= 0) break;
+    await db.articleTag.create({ data: { articleId, tagId: tag.id } });
+    room--;
+  }
+}
+
+/** Replace an article's product mentions, refresh the affected counters and update the article's tags. */
 async function saveMentions(analysisId: string, names: string[]) {
-  const before = await db.mention.findMany({ where: { analysisId }, select: { productId: true } });
+  const before = await db.mention.findMany({ where: { analysisId }, select: { productId: true, product: { select: { name: true } } } });
   await db.mention.deleteMany({ where: { analysisId } });
   const touched = new Set(before.map((m) => m.productId));
   const counts = new Map<string, number>();
@@ -111,6 +141,8 @@ async function saveMentions(analysisId: string, names: string[]) {
   for (const productId of touched) {
     await db.product.update({ where: { id: productId }, data: { articleCount: await db.mention.count({ where: { productId } }) } });
   }
+  const now = await db.mention.findMany({ where: { analysisId }, select: { product: { select: { name: true } } } });
+  await syncProductTags(analysisId, before.map((m) => m.product.name), now.map((m) => m.product.name));
 }
 
 /** Compare a new analysis with earlier ones in the same job and flag confirmed duplicates. */
