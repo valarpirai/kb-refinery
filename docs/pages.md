@@ -8,6 +8,7 @@ This is what each page shows and where its code lives.
 | `/jobs` | Every job, newest first | `src/app/jobs/page.tsx` |
 | `/jobs/[id]` | One job, live. Progress bar, count per status, one row per article. | `src/components/job-progress.tsx` |
 | `/analysis/[id]` | One article's report | `src/app/analysis/[id]/page.tsx` |
+| `/chat` | Ask one question, compare answers from original and refined docs | `src/app/chat/page.tsx` |
 | `/import` | Upload form and import history | `src/app/import/page.tsx` |
 | `/integrations` | Connect sources, set schedules, run now | `src/app/integrations/page.tsx` |
 

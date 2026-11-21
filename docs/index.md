@@ -12,6 +12,7 @@ KB Refinery reads knowledge base articles, finds what is wrong with them, and re
 | [ingestion.md](ingestion.md) | How articles and incidents get in. |
 | [pipeline.md](pipeline.md) | The stages, the LLM calls, and the queue. |
 | [pages.md](pages.md) | What each page shows. |
+| [chat.md](chat.md) | Compare answers from original and refined docs. |
 
 ## Status
 
@@ -24,7 +25,8 @@ KB Refinery reads knowledge base articles, finds what is wrong with them, and re
 | Jobs API | Done |
 | Pages: home, jobs, job detail, report | Done. Not checked in a browser. |
 | Integrations page and scheduled pulls | Done. Tested with a local feed. |
-| Chat, ask, eval scorer | Not built |
+| Chat comparison (original vs refined) | Done. Tested on seed data only. |
+| Eval scorer | Not built |
 
 ## Origin
 

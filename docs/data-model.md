@@ -35,6 +35,9 @@ An article is unique by data source plus external id. When the data source is em
 | `Job` | One run. Coarse status and counters. |
 | `JobItem` | One article inside a job. Its own status. This drives live progress. |
 | `PromptTemplate` | An LLM prompt with `{{placeholder}}` slots. |
+| `Chunk` | A searchable piece of an article, per variant (original or refined), with its vector. |
+| `Comparison` | One chat question, with your verdict. |
+| `ComparisonArm` | One side's answer, sources, time and auto-judge score. |
 
 ## Snapshots
 
@@ -57,6 +60,8 @@ The mechanical score is empty for content under 25 words.
 | `FindingState` | `new`, `acknowledged`, `remediated`, `cancelled` |
 
 A new run sets old open findings to `cancelled`. History stays. Only fresh findings count.
+
+`Chunk.embedding` is a pgvector column. Prisma cannot read or write it directly, so the indexer and the search use raw SQL.
 
 ## Not ported yet
 

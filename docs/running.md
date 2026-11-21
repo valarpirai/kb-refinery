@@ -19,6 +19,7 @@ psql -h localhost -d kb_refinery -c "CREATE EXTENSION IF NOT EXISTS vector"   # 
 pnpm db:migrate
 pnpm db:seed
 ollama pull qwen3:4b-thinking-2507-q4_K_M
+ollama pull nomic-embed-text
 ```
 
 ## Environment
@@ -32,6 +33,7 @@ All settings live in `.env`. The file is not committed. `.env.example` is.
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Where Ollama listens |
 | `OLLAMA_MODEL` | `qwen3:4b-thinking-2507-q4_K_M` | Model to call |
 | `OLLAMA_THINK` | `auto` | `auto`, `always` or `never`. See pipeline.md. |
+| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Model that makes chat search vectors |
 | `OLLAMA_NUM_CTX` | `16384` | Context window sent to Ollama |
 | `OLLAMA_TIMEOUT_MS` | `600000` | Per-call timeout |
 

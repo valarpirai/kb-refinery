@@ -19,7 +19,7 @@ This is what the app is made of and how the parts talk.
 The app runs as two processes.
 
 1. **Web server.** Next.js. It serves pages and the API. It accepts uploads and starts jobs.
-2. **Worker.** A plain Node script. It takes articles off the queue and runs the pipeline. It calls Ollama. It also runs scheduled source pulls.
+2. **Worker.** A plain Node script. It takes articles off the queue and runs the pipeline. It calls Ollama. It also runs scheduled source pulls, chat answers and indexing.
 
 They share one database. The web server never calls the LLM. The worker never serves a request. A slow model cannot block a page.
 
