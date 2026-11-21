@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { indexArticle } from "@/lib/chat/indexer";
 import { toMarkdown } from "./convert";
 import { formatFindings, formatIncidents, jsonOrNone } from "./format";
 import { findCandidateIncidents } from "./incidents";
@@ -266,6 +267,8 @@ export async function processJobItem(jobItemId: string): Promise<void> {
 
     await db.analysis.update({ where: { id: analysisId }, data: { pipelineStage: "ready", sourceUpdatedAt: article.updatedAt } });
     await setStatus(item.id, "completed");
+    // Chat search is a side benefit. If indexing fails, the article is still refined.
+    await indexArticle(article.id).catch((e) => console.warn(`[index] ${article.id}: ${(e as Error).message}`));
     await db.job.update({
       where: { id: jobId },
       data: { findingsGenerated: { increment: result.findings.length }, duplicatesFound: { increment: dupes } },
