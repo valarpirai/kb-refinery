@@ -55,6 +55,7 @@ export function NavMenu({ label, items }: { label: string; items: NavItem[] }) {
               <Menu.LinkItem
                 key={i.href}
                 href={i.href}
+                closeOnClick
                 render={<Link href={i.href} />}
                 aria-current={isCurrent(pathname, i.href) ? "page" : undefined}
                 className="block cursor-pointer rounded px-3 py-1.5 outline-none data-[highlighted]:bg-black/10 aria-[current=page]:font-semibold dark:data-[highlighted]:bg-white/15"
