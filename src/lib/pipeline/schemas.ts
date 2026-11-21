@@ -75,3 +75,10 @@ export const duplicateSchema = z.object({
 export const CONTENT_GAP_TYPES = new Set([
   "incomplete", "no_resolution_steps", "missing_prerequisites", "no_error_guidance", "outdated", "missing_context",
 ]);
+
+/** Chat answer from retrieved excerpts. */
+export const chatAnswerSchema = z.object({ answer: z.string().min(1) });
+
+/** Blind judge of two answers. */
+const judgeScore = z.object({ score: z.number().min(1).max(5), reasoning: str });
+export const judgeSchema = z.object({ answer_x: judgeScore, answer_y: judgeScore });

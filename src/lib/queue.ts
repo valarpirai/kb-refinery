@@ -2,6 +2,9 @@ import { PgBoss } from "pg-boss";
 
 export const REFINE_QUEUE = "refine-article";
 export const PULL_QUEUE = "pull-source";
+export const ANSWER_QUEUE = "answer-arm";
+export const JUDGE_QUEUE = "judge-comparison";
+export const INDEX_QUEUE = "index-articles";
 
 const globalForBoss = globalThis as unknown as { boss?: Promise<PgBoss> };
 
@@ -27,6 +30,9 @@ export function getBoss(): Promise<PgBoss> {
     await boss.start();
     await boss.createQueue(REFINE_QUEUE);
     await boss.createQueue(PULL_QUEUE);
+    await boss.createQueue(ANSWER_QUEUE);
+    await boss.createQueue(JUDGE_QUEUE);
+    await boss.createQueue(INDEX_QUEUE);
     return boss;
   })();
   return globalForBoss.boss;

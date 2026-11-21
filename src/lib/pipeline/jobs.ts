@@ -1,7 +1,9 @@
 import { db } from "@/lib/db";
 import { pullSource } from "@/lib/ingest/connectors";
 import { syncAllSchedules } from "@/lib/ingest/schedule";
-import { getBoss, PULL_QUEUE, REFINE_QUEUE } from "@/lib/queue";
+import { answerArm, judgeComparison } from "@/lib/chat/answer";
+import { indexAll } from "@/lib/chat/indexer";
+import { ANSWER_QUEUE, getBoss, INDEX_QUEUE, JUDGE_QUEUE, PULL_QUEUE, REFINE_QUEUE } from "@/lib/queue";
 import { processJobItem } from "./run-article";
 
 const BATCH_SIZE = 5;
@@ -73,6 +75,15 @@ export async function startWorker(): Promise<void> {
   });
   await boss.work<{ dataSourceId: string }>(PULL_QUEUE, async (jobs) => {
     for (const j of jobs) await pullSource(j.data.dataSourceId);
+  });
+  await boss.work<{ armId: string }>(ANSWER_QUEUE, async (jobs) => {
+    for (const j of jobs) await answerArm(j.data.armId);
+  });
+  await boss.work<{ comparisonId: string }>(JUDGE_QUEUE, async (jobs) => {
+    for (const j of jobs) await judgeComparison(j.data.comparisonId).catch((e) => console.warn("[judge]", e.message));
+  });
+  await boss.work(INDEX_QUEUE, async () => {
+    console.log("[index]", await indexAll());
   });
   await syncAllSchedules();
   console.log("[worker] listening on", REFINE_QUEUE, "and", PULL_QUEUE);
