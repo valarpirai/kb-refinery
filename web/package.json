@@ -9,15 +9,20 @@
     "lint": "eslint",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force && pnpm db:seed"
+    "db:reset": "prisma migrate reset --force && pnpm db:seed",
+    "worker": "tsx --env-file=.env scripts/worker.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "gray-matter": "^4.0.3",
     "next": "15.5.29",
+    "node-html-parser": "^9.0.7",
     "papaparse": "^5.7.1",
+    "pg-boss": "^12.38.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "turndown": "^7.2.5",
+    "turndown-plugin-gfm": "^1.0.2",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -27,6 +32,7 @@
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/turndown": "^5.0.6",
     "eslint": "^9",
     "eslint-config-next": "15.5.29",
     "prisma": "^6.19.3",
