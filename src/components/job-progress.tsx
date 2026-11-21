@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { restartItem, STAGE_LABEL } from "@/components/pipeline-restart";
 import { StatusPill } from "@/components/status-pill";
 import { STAGE_COLORS } from "@/lib/colors";
 import { label } from "@/lib/format";
+import { useLive } from "@/lib/use-live";
 import type { Stage } from "@/lib/pipeline/run-article";
 
 interface Item {
@@ -28,8 +29,6 @@ export interface JobData {
 }
 
 const STAGES = ["pending", "converting", "analyzing", "enriching", "scoring", "completed", "skipped", "failed"] as const;
-const FINISHED = ["completed", "completed_with_errors", "failed"];
-const BUSY_ITEM = ["pending", "converting", "analyzing", "enriching", "scoring"];
 const ITEM_STAGE = { converting: "convert", analyzing: "analyze", enriching: "enrich", scoring: "rewrite" } as const;
 
 /** Status pill that takes the stage color while an item is in progress. The text always names the state. */
@@ -39,7 +38,7 @@ function ItemPill({ status }: { status: string }) {
   return <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STAGE_COLORS[stage].soft}`}>{label(status)}</span>;
 }
 
-/** Live view of one job. Polls every 3 seconds until the job finishes. */
+/** Live view of one job. The server pushes a signal whenever the job or one of its items changes. */
 export function JobProgress({ initial }: { initial: JobData }) {
   const [job, setJob] = useState(initial);
 
@@ -56,14 +55,11 @@ export function JobProgress({ initial }: { initial: JobData }) {
     }
   }
 
-  // A restarted item can reopen a finished job, so keep polling while any item is still busy.
-  const live = !FINISHED.includes(job.status) || job.items.some((i) => BUSY_ITEM.includes(i.status));
-  useEffect(() => {
-    if (!live) return;
-    const timer = setInterval(refresh, 3000);
-    return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job.id, live]);
+  // Refetch when the server says this job changed, and after a reconnect (null).
+  // A restarted item can reopen a finished job, so this listens even when the job is done.
+  useLive((e) => {
+    if (e === null || e.job === job.id) void refresh();
+  });
 
   async function restart(itemId: string, stage: Stage) {
     setRestarting(itemId);

@@ -17,6 +17,7 @@ KB Refinery reads knowledge base articles, finds what is wrong with them, and re
 | [chat.md](chat.md) | Chat: talk to the agent, or compare original and refined docs. |
 | [auth.md](auth.md) | Login, roles, the default admin. |
 | [notifications.md](notifications.md) | The bell and toasts. |
+| [live-updates.md](live-updates.md) | How pages update without a reload. |
 
 ## Status
 

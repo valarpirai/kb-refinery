@@ -25,7 +25,7 @@ The Refine articles button opens a dialog. Search by title. Tick articles. Start
 
 ## Job page
 
-The page starts with the data the server loaded. Then the browser asks `GET /api/jobs/[id]` every 3 seconds. It stops when the job reaches a final status. No websockets.
+The page starts with the data the server loaded. Then the server pushes a signal when the job or one of its items changes, and the browser asks `GET /api/jobs/[id]`. See `live-updates.md`.
 
 A job item row links to the article report once the analysis exists. A failed row shows its error.
 
@@ -61,7 +61,7 @@ It sits on Home, under the headline numbers. Four rings are the stages: Ingest, 
 
 **Pick a state.** The rings narrow and a dot orbits that ring. The side shows what the state does, and the chosen article's real input and output at that step. With no article picked it asks you to pick one. The strip at the bottom is the average mechanical score at the raw, converted and rewritten versions.
 
-While the worker is busy the page refreshes every 5 seconds. A number that changes slides into place. A row washes green, its ring pings, the arc eases to its new length, and the core ripples when another article becomes AI-ready. Reduced motion swaps these for plain fades.
+When the pipeline changes, the server pushes a signal and the page refreshes. A number that changes slides into place. A row washes green, its ring pings, the arc eases to its new length, and the core ripples when another article becomes AI-ready. Reduced motion swaps these for plain fades.
 
 Code: `src/lib/pipeline/path.ts` (data), `src/components/pipeline-hero.tsx` and `.css`, `live-number.tsx`.
 
@@ -77,7 +77,7 @@ An article a worker is processing right now is skipped and listed. Try again whe
 
 ## The pipeline view
 
-On every report, under the summary, a stepper shows the six steps: Imported, Convert, Analyze, Enrich, Rewrite, Ready. Each step has its own color. The step the worker is on has a pulsing ring, and the connector into it sweeps. The page checks for changes every 2 seconds while a run is active and stops when it ends.
+On every report, under the summary, a stepper shows the six steps: Imported, Convert, Analyze, Enrich, Rewrite, Ready. Each step has its own color. The step the worker is on has a pulsing ring, and the connector into it sweeps. The page updates when the server says this article changed.
 
 If a step fails, it turns red and says Failed. A panel shows the full error, a **Restart from** button, and a menu to restart from an earlier step. The job page shows the same option on failed rows.
 

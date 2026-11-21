@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessageData, ToolCall } from "@/app/(app)/chat/types";
+import { useLive } from "@/lib/use-live";
+
+const FETCH_EVERY_MS = 800;
 
 /**
  * True while the agent is still working on this message.
@@ -74,24 +77,45 @@ interface Props {
   retryDisabled: boolean;
 }
 
-/** The agent's reply: tool calls, then prose that grows as text streams in. Polls every second while working. */
+/** The agent's reply: tool calls, then prose that grows as text streams in. Fetches when the server says it changed, while working. */
 export function ChatAgentMessage({ msg, isAdmin, fresh, onChange, onRetry, retryDisabled }: Props) {
   const busy = isAgentBusy(msg);
   const id = msg.id;
   const tools = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
 
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFetch = useRef(0);
+
+  /** Fetch the latest copy of this message. */
+  const load = useCallback(async () => {
+    lastFetch.current = Date.now();
+    try {
+      const res = await fetch(`/api/agent/messages/${id}`, { cache: "no-store" });
+      if (res.ok) onChange((await res.json()) as ChatMessageData);
+    } catch {
+      /* keep the last good state; the next change or reconnect fetches again */
+    }
+  }, [id, onChange]);
+
+  // One fetch when the reply starts being followed, in case it changed before the stream connected.
   useEffect(() => {
-    if (!busy) return;
-    const timer = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/agent/messages/${id}`, { cache: "no-store" });
-        if (res.ok) onChange((await res.json()) as ChatMessageData);
-      } catch {
-        /* keep the last good state and try again */
-      }
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [id, busy, onChange]);
+    if (busy) void load();
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
+    };
+  }, [busy, load]);
+
+  // After that, fetch only when the server says this message changed, at most once per interval.
+  // A trailing fetch means the last write is never missed. A reconnect (null) fetches too.
+  useLive((e) => {
+    if (e !== null && !(e.t === "ChatMessage" && e.id === id)) return;
+    if (timer.current) return;
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      void load();
+    }, Math.max(0, FETCH_EVERY_MS - (Date.now() - lastFetch.current)));
+  }, busy);
 
   const status = busy ? "Working…" : msg.status === "failed" ? "The agent failed." : "Answer ready.";
 

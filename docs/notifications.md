@@ -8,7 +8,7 @@ A **Notifications** button sits in the top bar. A blue count shows how many you 
 
 A toast also pops up in the corner when a new notification arrives while the page is open. It has an **Open** button.
 
-The page checks for new ones every 6 seconds, and pauses while the tab is hidden. The first check after load only records what already exists, so you are not hit with a pile of old toasts.
+The server pushes a signal the moment a notification is saved, and the page fetches the list. See `live-updates.md`. The first fetch after load only records what already exists, so you are not hit with a pile of old toasts.
 
 ## What triggers one
 

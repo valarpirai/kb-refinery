@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { STAGE_COLORS } from "@/lib/colors";
 import type { Stage } from "@/lib/pipeline/run-article";
+import { useLive } from "@/lib/use-live";
 import type { PipelineStatus, PipelineStep, StepState } from "@/lib/pipeline/status";
 import { restartItem, STAGE_LABEL } from "./pipeline-restart";
 import "./pipeline.css";
 
 const STATE_TEXT: Record<StepState, string> = { done: "Done", active: "Running", queued: "Queued", failed: "Failed", pending: "Waiting", skipped: "Skipped" };
 const DOING: Record<string, string> = { convert: "converting", analyze: "analyzing", enrich: "enriching", rewrite: "rewriting" };
-const POLL_MS = 2000;
 
 /**
  * Write one sentence that sums up where the article is.
@@ -92,7 +92,7 @@ function Step({ step, index, total, prev }: { step: PipelineStep; index: number;
 
 /**
  * Animated pipeline stepper for one article, with error details and restart.
- * Polls while the worker is running and stops when it is not.
+ * Updates live: the server pushes a signal when this article changes.
  * @param props.articleId the article to follow
  * @param props.initial the server-rendered status
  */
@@ -102,29 +102,27 @@ export function PipelineTunnel({ articleId, initial }: { articleId: string; init
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!status.running) return;
-    let cancelled = false;
+  const inflight = useRef<AbortController | null>(null);
+
+  /** Fetch the latest status. A newer request cancels an older one still in flight. */
+  const load = useCallback(async () => {
+    inflight.current?.abort();
     const ctrl = new AbortController();
-    const poll = async () => {
-      if (document.hidden) return;
-      try {
-        const res = await fetch(`/api/articles/${articleId}/pipeline`, { cache: "no-store", signal: ctrl.signal });
-        if (res.ok && !cancelled) setStatus((await res.json()) as PipelineStatus);
-      } catch {
-        /* keep the last good state; the next tick retries */
-      }
-    };
-    const timer = setInterval(poll, POLL_MS);
-    const onVisible = () => { if (!document.hidden) void poll(); };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      cancelled = true;
-      ctrl.abort();
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [articleId, status.running]);
+    inflight.current = ctrl;
+    try {
+      const res = await fetch(`/api/articles/${articleId}/pipeline`, { cache: "no-store", signal: ctrl.signal });
+      if (res.ok && !ctrl.signal.aborted) setStatus((await res.json()) as PipelineStatus);
+    } catch {
+      /* keep the last good state; the next change or reconnect refetches */
+    }
+  }, [articleId]);
+
+  useEffect(() => () => inflight.current?.abort(), []);
+
+  // Refetch when the server says this article changed, and after a reconnect (null).
+  useLive((e) => {
+    if (e === null || e.article === articleId) void load();
+  });
 
   const item = status.item;
   const failedStage = item?.failedStage ?? null;

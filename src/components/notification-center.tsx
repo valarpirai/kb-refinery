@@ -4,6 +4,7 @@ import { Popover } from "@base-ui/react/popover";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
+import { useLive } from "@/lib/use-live";
 import "./notification-center.css";
 
 interface Item {
@@ -16,7 +17,6 @@ interface Item {
   createdAt: string;
 }
 
-const POLL_MS = 6000;
 const LEVEL_LABEL = { info: "Info", success: "Done", warning: "Heads up", error: "Problem" } as const;
 const LEVEL_STYLE = {
   info: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
@@ -58,11 +58,12 @@ export function NotificationCenter() {
 
   useEffect(() => {
     void load();
-    const timer = setInterval(() => {
-      if (!document.hidden) void load();
-    }, POLL_MS);
-    return () => clearInterval(timer);
   }, [load]);
+
+  // The server says when one of this user's notifications changes. A reconnect (null) resyncs.
+  useLive((e) => {
+    if (e === null || e.t === "Notification") void load();
+  });
 
   async function markRead(ids?: string[]) {
     await fetch("/api/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ids ? { ids } : {}) });

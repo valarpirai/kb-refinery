@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LiveNumber, useBump } from "@/components/live-number";
 import { formatBytes } from "@/lib/format";
 import type { PaneData, PathStage, RefiningPath, StepState } from "@/lib/pipeline/path";
+import { useLive } from "@/lib/use-live";
 import "./pipeline-hero.css";
 
 /** Ring widths as a percentage of the square stage. One source of truth for the geometry. */
@@ -16,7 +17,9 @@ const RING_TINT: Record<number, { body: string; tint: string }> = {
   3: { body: "#8b5cf6", tint: "139, 92, 246" },
   4: { body: "#f59e0b", tint: "245, 158, 11" },
 };
-const REFRESH_MS = 5000;
+/** Wait this long after the first change so a burst of writes causes one refresh. */
+const REFRESH_MS = 600;
+const PIPELINE_TABLES = ["Job", "JobItem", "StageRun", "Analysis", "Article"];
 /** The arc is drawn at this radius in a 0 to 100 box, so its length is fixed and the offset is the unfilled part. */
 const ARC_RADIUS = 46;
 const ARC_LENGTH = 2 * Math.PI * ARC_RADIUS;
@@ -155,7 +158,7 @@ function StageDetail({ stage, index, next, here, step, onBack, onNext }: { stage
 /**
  * The refining path as concentric rings narrowing to an AI-ready core.
  * At rest it lists the five states. Pick one and the rings narrow, and its real input and output appear.
- * While the worker is busy, the page refreshes itself and every changed number animates.
+ * When the pipeline changes, the server pushes a signal, the page refreshes and every changed number animates.
  */
 export function PipelineHero({ data }: { data: RefiningPath }) {
   const router = useRouter();
@@ -174,13 +177,18 @@ export function PipelineHero({ data }: { data: RefiningPath }) {
   const coreWord = coreStep === "done" ? "AI-ready" : coreStep === "skipped" ? "No gaps" : coreStep === "failed" ? "Failed" : "Not yet";
   const articleBumps = useBump(data.selectedArticleId);
 
-  useEffect(() => {
-    if (!data.live) return;
-    const timer = setInterval(() => {
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (refreshTimer.current) clearTimeout(refreshTimer.current); }, []);
+
+  // Any pipeline change, or a reconnect (null), re-renders the page data. A burst becomes one refresh.
+  useLive((e) => {
+    if (e !== null && !PIPELINE_TABLES.includes(e.t)) return;
+    if (refreshTimer.current) return;
+    refreshTimer.current = setTimeout(() => {
+      refreshTimer.current = null;
       if (document.visibilityState === "visible") router.refresh();
     }, REFRESH_MS);
-    return () => clearInterval(timer);
-  }, [data.live, router]);
+  });
 
   const track = [
     { label: "Rim", value: data.scoreTrack.raw, tone: "raw" },
