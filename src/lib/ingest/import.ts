@@ -5,6 +5,8 @@ import type { ParsedArticle, ParsedIncident, UploadKind } from "./types";
 export interface InputFile {
   name: string;
   text: string;
+  /** Where the content came from, saved on articles that do not name their own URL. */
+  url?: string;
 }
 
 export interface ImportOptions {
@@ -12,6 +14,8 @@ export interface ImportOptions {
   files: InputFile[];
   label?: string;
   dataSourceId?: string | null;
+  /** The user who started the import, so they can be notified. */
+  userId?: string | null;
 }
 
 type Outcome = "created" | "updated" | "skipped";
@@ -66,10 +70,11 @@ async function upsertIncident(i: ParsedIncident, importRunId: string): Promise<O
  * Parse and store a batch of uploaded files as one ImportRun.
  * A bad file or row is recorded in the run's errors and never stops the rest.
  */
-export async function runImport({ kind, files, label, dataSourceId = null }: ImportOptions) {
+export async function runImport({ kind, files, label, dataSourceId = null, userId = null }: ImportOptions) {
   const run = await db.importRun.create({
     data: {
       dataSourceId,
+      userId,
       label: label ?? (files.length === 1 ? files[0].name : `${files.length} files`),
       status: "running",
     },
@@ -80,6 +85,7 @@ export async function runImport({ kind, files, label, dataSourceId = null }: Imp
   for (const file of files) {
     const parsed = parseFile(kind, file.name, file.text);
     parsed.errors.forEach((e) => errors.push(`${file.name}: ${e}`));
+    if (file.url && kind === "articles") for (const item of parsed.items) (item as ParsedArticle).url ??= file.url;
     for (const item of parsed.items) {
       counts.total++;
       try {

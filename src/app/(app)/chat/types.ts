@@ -37,11 +37,36 @@ export interface ConversationItem {
   updatedAt: string;
 }
 
+export interface ToolCall {
+  id: string;
+  name: string;
+  input?: unknown;
+  output?: unknown;
+  status: "running" | "success" | "error";
+  startedAt?: string;
+  endedAt?: string;
+}
+
+export interface ChatMessageData {
+  id: string;
+  conversationId: string;
+  role: "user" | "assistant";
+  content: string;
+  status: "pending" | "streaming" | "completed" | "failed";
+  toolCalls: ToolCall[];
+  error: string | null;
+  traceId: string | null;
+  createdAt: string;
+}
+
 export interface ConversationData {
   id: string;
   title: string;
   comparisons: ComparisonData[];
+  messages: ChatMessageData[];
 }
+
+export type ChatMode = "agent" | "compare";
 
 export type Tally = Record<Verdict, number>;
 

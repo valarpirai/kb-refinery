@@ -164,7 +164,6 @@ model ImportRun {
   user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   articles   Article[]
   incidents  Incident[]
-  agentRuns  AgentRun[]
 }
 
 /// A source KB article. Replaces ServiceNow kb_knowledge.
@@ -351,7 +350,6 @@ model Job {
   findings        Finding[]
   user            User?      @relation(fields: [userId], references: [id])
   userId          String?
-  agentRun        AgentRun?
 }
 
 /// One row per (job, article): the real per-article pipeline status.
@@ -471,7 +469,6 @@ model User {
   accounts      Account[]
   conversations Conversation[]
   notifications Notification[]
-  agentRuns     AgentRun[]
   jobs          Job[]
   importRuns    ImportRun[]
   dataSources   DataSource[]
@@ -534,26 +531,6 @@ enum NotificationLevel {
   error
 }
 
-enum AgentTrigger {
-  upload
-  pull
-}
-
-enum AgentStatus {
-  running
-  completed
-  completed_with_errors
-  failed
-}
-
-enum AgentStepStatus {
-  pending
-  running
-  done
-  skipped
-  failed
-}
-
 /// A saved chat. Each question in it is a Comparison.
 model Conversation {
   id        String   @id @default(cuid())
@@ -562,8 +539,9 @@ model Conversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   comparisons Comparison[]
+  messages    ChatMessage[]
 
   @@index([userId, updatedAt])
 }
@@ -584,39 +562,51 @@ model Notification {
   @@index([userId, readAt, createdAt])
 }
 
-/// One autonomous run: picks up an import, refines it, reports back.
-model AgentRun {
-  id          String       @id @default(cuid())
-  userId      String?
-  trigger     AgentTrigger
-  status      AgentStatus  @default(running)
-  importRunId String?
-  jobId       String?      @unique
-  summary     String?
-  createdAt   DateTime     @default(now())
-  finishedAt  DateTime?
+// ---------------------------------------------------------------------------
+// Agent chat and traces
+// ---------------------------------------------------------------------------
 
-  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  importRun ImportRun?  @relation(fields: [importRunId], references: [id], onDelete: SetNull)
-  job       Job?        @relation(fields: [jobId], references: [id], onDelete: SetNull)
-  steps     AgentStep[]
-
-  @@index([userId, createdAt])
+enum MessageRole {
+  user
+  assistant
 }
 
-/// One visible step of an agent run, shown as a timeline.
-model AgentStep {
-  id         String          @id @default(cuid())
-  runId      String
-  ord        Int
-  key        String
-  title      String
-  status     AgentStepStatus @default(pending)
-  detail     String?
-  startedAt  DateTime?
-  finishedAt DateTime?
+enum MessageStatus {
+  pending
+  streaming
+  completed
+  failed
+}
 
-  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+/// One message in an agent conversation. Assistant messages are filled in by the worker as the agent runs.
+model ChatMessage {
+  id             String        @id @default(cuid())
+  conversationId String
+  role           MessageRole
+  content        String        @default("")
+  status         MessageStatus @default(completed)
+  toolCalls      Json          @default("[]") // [{ id, name, input, output, status, startedAt, endedAt }]
+  error          String?
+  traceId        String?
+  createdAt      DateTime      @default(now())
 
-  @@unique([runId, ord])
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+/// One OpenTelemetry span collected by Traceloop. Stored locally so traces never leave this machine by default.
+model TraceSpan {
+  spanId     String   @id
+  traceId    String
+  parentId   String?
+  name       String
+  startedAt  DateTime
+  durationMs Float
+  status     String   @default("ok") // ok | error
+  attributes Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  @@index([traceId, startedAt])
+  @@index([startedAt])
 }

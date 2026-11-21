@@ -21,7 +21,10 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
     c
       ? db.conversation.findFirst({
           where: { id: c, userId: user.id },
-          include: { comparisons: { orderBy: { createdAt: "asc" }, include: { arms: true } } },
+          include: {
+            comparisons: { orderBy: { createdAt: "asc" }, include: { arms: true } },
+            messages: { orderBy: { createdAt: "asc" } },
+          },
         })
       : null,
     db.comparison.groupBy({ by: ["verdict"], where: { conversation: { userId: user.id } }, _count: true }),
@@ -37,6 +40,7 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
   return (
     <ChatShell
       userName={user.name}
+      isAdmin={user.role === "admin"}
       initialConversations={JSON.parse(JSON.stringify(conversations)) as ConversationItem[]}
       initialActive={selected ? (JSON.parse(JSON.stringify(selected)) as ConversationData) : null}
       initialTally={tally}

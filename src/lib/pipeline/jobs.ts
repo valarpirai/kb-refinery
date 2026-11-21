@@ -3,7 +3,8 @@ import { pullSource } from "@/lib/ingest/connectors";
 import { syncAllSchedules } from "@/lib/ingest/schedule";
 import { answerArm, judgeComparison } from "@/lib/chat/answer";
 import { indexAll } from "@/lib/chat/indexer";
-import { ANSWER_QUEUE, getBoss, INDEX_QUEUE, JUDGE_QUEUE, PULL_QUEUE, REFINE_QUEUE } from "@/lib/queue";
+import { runAgentMessage } from "@/lib/agent/run";
+import { AGENT_QUEUE, ANSWER_QUEUE, getBoss, INDEX_QUEUE, JUDGE_QUEUE, PULL_QUEUE, REFINE_QUEUE } from "@/lib/queue";
 import { processJobItem } from "./run-article";
 
 const BATCH_SIZE = 5;
@@ -12,9 +13,10 @@ const BATCH_SIZE = 5;
  * Create a job with one item per article and queue each item for processing.
  * @param articleIds articles to refine; omit to refine every article
  * @param scope a short label shown in the UI
+ * @param userId who started the job, so they can be notified when it ends
  * @return the created job
  */
-export async function createJob(articleIds?: string[], scope?: string) {
+export async function createJob(articleIds?: string[], scope?: string, userId?: string | null) {
   const articles = await db.article.findMany({
     where: articleIds ? { id: { in: articleIds } } : undefined,
     select: { id: true },
@@ -24,6 +26,7 @@ export async function createJob(articleIds?: string[], scope?: string) {
 
   const job = await db.job.create({
     data: {
+      userId: userId ?? null,
       status: "pending",
       articlesTotal: articles.length,
       remainingBatches: Math.ceil(articles.length / BATCH_SIZE),
@@ -84,6 +87,9 @@ export async function startWorker(): Promise<void> {
   });
   await boss.work(INDEX_QUEUE, async () => {
     console.log("[index]", await indexAll());
+  });
+  await boss.work<{ assistantId: string }>(AGENT_QUEUE, async (jobs) => {
+    for (const j of jobs) await runAgentMessage(j.data.assistantId);
   });
   await syncAllSchedules();
   console.log("[worker] listening on", REFINE_QUEUE, "and", PULL_QUEUE);

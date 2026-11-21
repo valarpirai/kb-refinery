@@ -5,6 +5,7 @@ export const PULL_QUEUE = "pull-source";
 export const ANSWER_QUEUE = "answer-arm";
 export const JUDGE_QUEUE = "judge-comparison";
 export const INDEX_QUEUE = "index-articles";
+export const AGENT_QUEUE = "agent-message";
 
 const globalForBoss = globalThis as unknown as { boss?: Promise<PgBoss> };
 
@@ -33,6 +34,7 @@ export function getBoss(): Promise<PgBoss> {
     await boss.createQueue(ANSWER_QUEUE);
     await boss.createQueue(JUDGE_QUEUE);
     await boss.createQueue(INDEX_QUEUE);
+    await boss.createQueue(AGENT_QUEUE);
     return boss;
   })();
   return globalForBoss.boss;

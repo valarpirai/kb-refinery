@@ -15,7 +15,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const conversation = await db.conversation.findFirst({
     where: { id, userId: user.id },
-    include: { comparisons: { orderBy: { createdAt: "asc" }, include: { arms: true } } },
+    include: {
+      comparisons: { orderBy: { createdAt: "asc" }, include: { arms: true } },
+      messages: { orderBy: { createdAt: "asc" } },
+    },
   });
   if (!conversation) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(conversation);

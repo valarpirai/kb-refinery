@@ -7,6 +7,7 @@ export interface SessionUser {
   id: string;
   name: string;
   email: string;
+  role: "admin" | "user";
 }
 
 /**
@@ -15,7 +16,9 @@ export interface SessionUser {
  */
 export async function getUser(): Promise<SessionUser | null> {
   const session = await auth.api.getSession({ headers: await headers() });
-  return session?.user ? { id: session.user.id, name: session.user.name, email: session.user.email } : null;
+  if (!session?.user) return null;
+  const { id, name, email } = session.user;
+  return { id, name, email, role: (session.user as { role?: string }).role === "admin" ? "admin" : "user" };
 }
 
 /**

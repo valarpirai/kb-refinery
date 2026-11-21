@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, type RefObject } from "react";
+import type { ChatMode } from "@/app/(app)/chat/types";
 
 const MAX_HEIGHT = 192; // 8 lines of 24px
 
@@ -10,6 +11,8 @@ interface Props {
   onSend: () => void;
   /** True while a question is being sent or answered. */
   busy: boolean;
+  mode: ChatMode;
+  onMode: (mode: ChatMode) => void;
   blind: boolean;
   onBlind: (value: boolean) => void;
   error: string | null;
@@ -17,7 +20,7 @@ interface Props {
 }
 
 /** The message box pinned to the bottom of the chat. Enter sends, Shift+Enter adds a line. */
-export function ChatComposer({ query, onQuery, onSend, busy, blind, onBlind, error, inputRef }: Props) {
+export function ChatComposer({ query, onQuery, onSend, busy, mode, onMode, blind, onBlind, error, inputRef }: Props) {
   const canSend = !busy && query.trim().length >= 3;
 
   useLayoutEffect(() => {
@@ -45,7 +48,7 @@ export function ChatComposer({ query, onQuery, onSend, busy, blind, onBlind, err
             value={query}
             rows={1}
             maxLength={1000}
-            placeholder="Ask about your docs…"
+            placeholder={mode === "agent" ? "Ask the agent to import, refine or look something up…" : "Ask one question to compare original and refined docs…"}
             onChange={(e) => onQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -55,10 +58,19 @@ export function ChatComposer({ query, onQuery, onSend, busy, blind, onBlind, err
             }}
           />
           <div className="chat-box-row">
-            <label className="chat-switch" title="Hide which answer is original until you choose a verdict">
-              <input type="checkbox" role="switch" checked={blind} onChange={(e) => onBlind(e.target.checked)} />
-              <span>Blind mode</span>
-            </label>
+            <div className="chat-box-left">
+              <div role="group" aria-label="Mode" className="chat-seg">
+                {([["agent", "Agent"], ["compare", "Compare docs"]] as const).map(([m, label]) => (
+                  <button key={m} type="button" aria-pressed={mode === m} onClick={() => onMode(m)}>{label}</button>
+                ))}
+              </div>
+              {mode === "compare" && (
+                <label className="chat-switch" title="Hide which answer is original until you choose a verdict">
+                  <input type="checkbox" role="switch" checked={blind} onChange={(e) => onBlind(e.target.checked)} />
+                  <span>Blind mode</span>
+                </label>
+              )}
+            </div>
             <button type="submit" className="chat-send chat-press" disabled={!canSend} aria-label="Send question">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 19V5" />
