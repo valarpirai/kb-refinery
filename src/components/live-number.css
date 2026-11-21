@@ -1,0 +1,23 @@
+/* A changed number rises into place. Opacity and transform only. */
+.live-number {
+  display: inline-block;
+  animation: live-number-in 320ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes live-number-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.45em);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-number {
+    animation: live-number-fade 200ms linear;
+  }
+  @keyframes live-number-fade {
+    from {
+      opacity: 0;
+    }
+  }
+}

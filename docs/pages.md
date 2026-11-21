@@ -9,6 +9,7 @@ This is what each page shows and where its code lives.
 | `/jobs/[id]` | One job, live. Progress bar, count per status, one row per article. | `src/components/job-progress.tsx` |
 | `/analysis/[id]` | One article's report | `src/app/(app)/analysis/[id]/page.tsx` |
 | `/chat` | Chat with the agent, or compare original and refined answers. Saved conversations. | `src/app/(app)/chat/page.tsx` |
+| `/pipeline` | The refining path: rings narrowing to an AI-ready core, with each stage's real input and output | `src/app/(app)/pipeline/page.tsx` |
 | `/articles` | Every article: search, filter, sort, pages, inline tags, bulk refine | `src/app/(app)/articles/page.tsx` |
 | `/articles/[id]` | Opens the article's analysis page (or a preview with a Refine button if it has none) | `src/app/(app)/articles/[id]/page.tsx` |
 | `/traces` | Admin only. Agent traces with filters | `src/app/(app)/traces/page.tsx` |
@@ -45,11 +46,27 @@ Cancelled findings are hidden. They belong to older runs.
 
 Markdown renders through `react-markdown`. It does not run raw HTML from the article. Original HTML is shown as plain text, never injected into the page.
 
+## Refining path
+
+Four headline numbers, then a hero. Four rings are the stages: Ingest, Convert, Analyze, Enrich. The core is AI-ready. A card on the left is the whole knowledge base.
+
+Counts are for the **latest job**. An article sits in the ring it is in now, and leaves it when it moves on. Finished articles show in the core. Articles with no findings, skipped ones and failed ones are listed under the state list as having left the path.
+
+Pick a state. The rings narrow and a dot orbits that state's ring. The side shows what the state does, and one real article's input and output at that step. Use the **KB article** picker to change which article it shows. The strip at the bottom is the average mechanical score at the raw, converted and rewritten versions of this job.
+
+While the worker is busy the page refreshes every 5 seconds. A number that changes slides into place. A row washes green, its ring pings, and the core ripples when another article becomes AI-ready. Reduced motion swaps these for plain fades.
+
+Code: `src/lib/pipeline/path.ts` (data), `src/components/pipeline-hero.tsx` and `.css`, `live-number.tsx`.
+
 ## Articles
 
 Search matches the title, the knowledge base and tag names. Filter by stage, knowledge base and tag. Sort by last update, title or score. Each row has a six-dot strip, one dot per pipeline step, each step in its own color, with a text summary for screen readers.
 
 Tags: click a tag's × to remove it. Type in the add box and press Enter to add one. Tags are lowercase, 1 to 40 characters, up to 20 per article. Everyone shares one set of tags.
+
+Delete: admins see a **Delete** button on the article and report pages. In the list, tick rows and use **Delete (n)**, up to 200 at a time. A confirmation asks first. Deleting removes the analysis, findings, refined versions, tags, timings and chat search data. It cannot be undone, and a source pull may bring the article back.
+
+An article a worker is processing right now is skipped and listed. Try again when it finishes. Code: `src/lib/articles/delete.ts`.
 
 ## The pipeline view
 
