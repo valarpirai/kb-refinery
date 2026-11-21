@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { runImport } from "@/lib/ingest/import";
 import { createJob } from "@/lib/pipeline/jobs";
 import { listFailedItems, restartJobItem } from "@/lib/pipeline/restart";
-import { MIN_SCORE, retrieve } from "@/lib/chat/answer";
+import { MIN_SCORE, retrieve } from "@/lib/chat/retrieve";
 import { embed } from "@/lib/chat/embed";
 import { crawl } from "./crawl";
 
@@ -182,7 +182,7 @@ export function buildTools(ctx: ToolContext, enabled?: string[]) {
     inputSchema: z.object({ question: z.string().min(3).describe("The question rewritten to stand alone. Replace words like it, that or and on mac with what they refer to, using the conversation so far.") }),
     callback: async ({ question }) => {
       const [vector] = await embed([question], "query");
-      const sources = await retrieve("refined", vector, MIN_SCORE);
+      const sources = await retrieve("refined", vector, question, MIN_SCORE);
       return json(sources.map((s) => ({ n: s.n, article_id: s.articleId, title: s.title, heading: s.heading, relevance: Number(s.score.toFixed(2)), excerpt: s.excerpt })));
     },
   });
