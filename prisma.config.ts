@@ -12,5 +12,8 @@ export default defineConfig({
   engine: "classic",
   datasource: {
     url: env("DATABASE_URL"),
+    // pgvector needs a superuser to install, so migrations diff against a shadow
+    // database that already has the extension. See docs/running.md.
+    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL,
   },
 });

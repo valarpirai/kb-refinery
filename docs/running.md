@@ -15,6 +15,7 @@ This is how to set the app up and run it. Use pnpm for everything. Do not use np
 pnpm install
 cp .env.example .env
 psql -U postgres -h localhost -c "CREATE DATABASE kb_refinery"
+psql -h localhost -d kb_refinery -c "CREATE EXTENSION IF NOT EXISTS vector"   # as a superuser
 pnpm db:migrate
 pnpm db:seed
 ollama pull qwen3:4b-thinking-2507-q4_K_M
@@ -27,6 +28,7 @@ All settings live in `.env`. The file is not committed. `.env.example` is.
 | Variable | Default | Meaning |
 |---|---|---|
 | `DATABASE_URL` | local `kb_refinery`, user `postgres` | Postgres connection |
+| `SHADOW_DATABASE_URL` | scratch DB `kb_refinery_shadow` | Used only by `pnpm db:migrate`. See below. |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Where Ollama listens |
 | `OLLAMA_MODEL` | `qwen3:4b-thinking-2507-q4_K_M` | Model to call |
 | `OLLAMA_THINK` | `auto` | `auto`, `always` or `never`. See pipeline.md. |
@@ -73,3 +75,9 @@ An empty body refines every article. Pass `{"articleIds": ["..."]}` for some. Th
 ## Using another model
 
 Set `OLLAMA_MODEL` and restart the worker. Any Ollama model that supports JSON output works. A model with a thinking mode gives better rewrites but runs much slower.
+
+## pgvector
+
+Chat search uses the pgvector extension. Installing an extension needs a superuser. The app's `postgres` role is not one, so a superuser must run `CREATE EXTENSION vector` in `kb_refinery` once. The migration then skips it.
+
+`pnpm db:migrate` also replays all migrations in a scratch database. That database needs the extension too, and Prisma wipes it on each run. So `SHADOW_DATABASE_URL` points at a superuser role and a database called `kb_refinery_shadow`. Create that database once. The app itself never uses it.
