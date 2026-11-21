@@ -19,6 +19,12 @@
   }
 }
 
+/* No focus outlines anywhere. This wins over component and utility outlines. */
+*:focus,
+*:focus-visible {
+  outline: none !important;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

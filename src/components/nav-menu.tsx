@@ -21,13 +21,13 @@ function isCurrent(pathname: string, href: string): boolean {
 }
 
 const triggerClass =
-  "inline-flex items-center gap-1 rounded px-2 py-1 text-sm hover:bg-black/5 data-[popup-open]:bg-black/10 dark:hover:bg-white/10 dark:data-[popup-open]:bg-white/15";
+  "inline-flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-sm hover:bg-black/5 data-[popup-open]:bg-black/10 dark:hover:bg-white/10 dark:data-[popup-open]:bg-white/15";
 
 /** A single top-level link. */
 export function NavLink({ item }: { item: NavItem }) {
   const current = isCurrent(usePathname(), item.href);
   return (
-    <Link href={item.href} aria-current={current ? "page" : undefined} className={`rounded px-2 py-1 text-sm hover:bg-black/5 dark:hover:bg-white/10 ${current ? "font-semibold" : ""}`}>
+    <Link href={item.href} aria-current={current ? "page" : undefined} className={`cursor-pointer rounded px-2 py-1 text-sm hover:bg-black/5 dark:hover:bg-white/10 ${current ? "font-semibold" : ""}`}>
       {item.label}
     </Link>
   );
@@ -42,7 +42,7 @@ export function NavMenu({ label, items }: { label: string; items: NavItem[] }) {
   const hasCurrent = items.some((i) => isCurrent(pathname, i.href));
   return (
     <Menu.Root>
-      <Menu.Trigger className={`${triggerClass} ${hasCurrent ? "font-semibold" : ""}`}>
+      <Menu.Trigger openOnHover delay={80} closeDelay={150} className={`${triggerClass} ${hasCurrent ? "font-semibold" : ""}`}>
         {label}
         <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className="opacity-60">
           <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -57,7 +57,7 @@ export function NavMenu({ label, items }: { label: string; items: NavItem[] }) {
                 href={i.href}
                 render={<Link href={i.href} />}
                 aria-current={isCurrent(pathname, i.href) ? "page" : undefined}
-                className="block cursor-default rounded px-3 py-1.5 outline-none data-[highlighted]:bg-black/10 aria-[current=page]:font-semibold dark:data-[highlighted]:bg-white/15"
+                className="block cursor-pointer rounded px-3 py-1.5 outline-none data-[highlighted]:bg-black/10 aria-[current=page]:font-semibold dark:data-[highlighted]:bg-white/15"
               >
                 {i.label}
               </Menu.LinkItem>

@@ -129,7 +129,8 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
   }, []);
 
   const updateMessage = useCallback((next: ChatMessageData) => {
-    setActive((a) => (a ? { ...a, messages: a.messages.map((m) => (m.id === next.id ? { ...m, ...next } : m)) } : a));
+    // Keep createdAt. A sent message gets a browser timestamp, and the server's earlier one would sort the reply above the question.
+    setActive((a) => (a ? { ...a, messages: a.messages.map((m) => (m.id === next.id ? { ...m, ...next, createdAt: m.createdAt } : m)) } : a));
   }, []);
 
   const thread: ({ kind: "compare"; cmp: ComparisonData } | { kind: "message"; msg: ChatMessageData })[] = (active
