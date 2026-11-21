@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { ArticleDeleteButton } from "@/components/article-delete-button";
 import { PipelineTunnel } from "@/components/pipeline-tunnel";
 import { ContentViewer, type Version } from "@/components/content-viewer";
-import { ScoreChart } from "@/components/score-chart";
 import { StatusPill } from "@/components/status-pill";
 import { db } from "@/lib/db";
 import { label, severityClass } from "@/lib/format";
@@ -13,7 +12,6 @@ import { requirePageUser } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 const ORDER = ["raw", "converted", "enriched"] as const;
-const STAGE_NAME = { raw: "Original", converted: "Converted", enriched: "Rewritten" } as const;
 
 export default async function AnalysisPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requirePageUser();
@@ -39,7 +37,6 @@ export default async function AnalysisPage({ params }: { params: Promise<{ id: s
   const snapshots = latest ? await db.snapshot.findMany({ where: { analysisId: id, version: latest.version } }) : [];
   const byType = (t: string) => snapshots.find((s) => s.type === t);
 
-  const rows = ORDER.filter((t) => byType(t)).map((t) => ({ stage: STAGE_NAME[t], mechanical: byType(t)!.score, model: byType(t)!.llmScore }));
   const versions: Version[] = ORDER.filter((t) => byType(t)).map((t) => ({
     type: t,
     content: byType(t)!.content,
@@ -74,11 +71,6 @@ export default async function AnalysisPage({ params }: { params: Promise<{ id: s
           <PipelineTunnel articleId={analysis.articleId} initial={pipeline} />
         </section>
       )}
-
-      <section aria-labelledby="scores">
-        <h2 id="scores" className="mb-3 text-lg font-medium">Scores</h2>
-        {rows.length === 0 ? <p className="text-sm opacity-70">Not scored yet.</p> : <ScoreChart rows={rows} />}
-      </section>
 
       <section aria-labelledby="findings">
         <h2 id="findings" className="mb-3 text-lg font-medium">Findings ({analysis.findings.length})</h2>

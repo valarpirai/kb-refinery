@@ -36,3 +36,15 @@ export function formatBytes(bytes: number | null | undefined): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/**
+ * Show a duration as short text.
+ * @param ms length in milliseconds
+ * @return text such as 850 ms, 12.4 s or 5 min 53 s
+ */
+export function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)} min ${total % 60} s`;
+}

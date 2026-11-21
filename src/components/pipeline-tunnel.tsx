@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { STAGE_COLORS } from "@/lib/colors";
+import { formatBytes, formatDuration } from "@/lib/format";
 import type { Stage } from "@/lib/pipeline/run-article";
 import { useLive } from "@/lib/use-live";
 import type { PipelineStatus, PipelineStep, StepState } from "@/lib/pipeline/status";
+import type { StageDetail } from "@/lib/pipeline/stage-detail";
 import { restartItem, STAGE_LABEL } from "./pipeline-restart";
 import "./pipeline.css";
 
@@ -46,7 +48,27 @@ function Icon({ state, animate }: { state: StepState; animate: boolean }) {
   return null;
 }
 
-function Step({ step, index, total, prev }: { step: PipelineStep; index: number; total: number; prev: StepState | null }) {
+/**
+ * The time, scores and size under a step. Parts that are unknown, or that a stage does not have, are left out.
+ * @param step the pipeline step
+ */
+function StepFacts({ step }: { step: PipelineStep }) {
+  const d = step.detail;
+  if (!d || step.state === "pending" || step.state === "queued" || step.state === "skipped") return null;
+  const lines = [
+    d.durationMs != null ? `${step.key === "ready" ? "Total " : ""}${formatDuration(d.durationMs)}` : null,
+    d.mechanical != null || d.model != null ? `Score ${d.mechanical ?? "–"} mech · ${d.model ?? "–"} model` : null,
+    d.bytes != null ? `${d.words != null ? `${d.words.toLocaleString("en-US")} words · ` : ""}${formatBytes(d.bytes)}` : null,
+  ].filter((l): l is string => l !== null);
+  if (lines.length === 0) return null;
+  return (
+    <span className="mt-0.5 flex flex-col text-xs opacity-80 md:items-center">
+      {lines.map((l) => <span key={l}>{l}</span>)}
+    </span>
+  );
+}
+
+function Step({ step, index, total, prev, selected, onSelect }: { step: PipelineStep; index: number; total: number; prev: StepState | null; selected: boolean; onSelect: () => void }) {
   const colors = STAGE_COLORS[step.key];
   const { state } = step;
   // Only animate a check mark that appears after mount, never one that was already there.
@@ -79,14 +101,52 @@ function Step({ step, index, total, prev }: { step: PipelineStep; index: number;
           <span className={`pl-seg-fill ${colors.solid}`} />
         </span>
       </div>
-      <div className="flex flex-col justify-center pb-2 md:items-center md:pb-0 md:text-center">
+      <button type="button" onClick={onSelect} aria-expanded={selected} aria-controls="stage-detail" title={`Show what happened in ${step.label}`}
+        className={`flex cursor-pointer flex-col justify-center rounded px-2 pb-2 text-left hover:bg-black/5 md:items-center md:pb-1 md:text-center dark:hover:bg-white/10 ${selected ? "bg-black/5 dark:bg-white/10" : ""}`}>
         <span className={state === "active" ? "text-base font-bold" : "text-sm font-medium"}>{step.label}</span>
         <span className={`text-xs ${state === "failed" ? "font-semibold text-red-700 dark:text-red-300" : state === "active" ? `font-semibold ${colors.text}` : "opacity-70"}`}>
           {state === "failed" && <span aria-hidden="true">⚠ </span>}
           {STATE_TEXT[state]}
         </span>
-      </div>
+        <StepFacts step={step} />
+      </button>
     </li>
+  );
+}
+
+/**
+ * What happened in the chosen stage: facts, lists, recent runs and any error.
+ * @param props.detail the loaded details, or null while loading
+ * @param props.label the stage's display name
+ */
+function StageDetailPanel({ detail, label }: { detail: StageDetail | null; label: string }) {
+  return (
+    <div id="stage-detail" className="rounded border border-black/10 p-4 text-sm dark:border-white/15" aria-live="polite">
+      <h3 className="font-semibold">{label}</h3>
+      {!detail ? <p className="mt-2 opacity-70">Loading…</p> : (
+        <div className="mt-2 space-y-3">
+          <p className="opacity-80">{detail.about}</p>
+          {detail.error && <p role="alert" className="whitespace-pre-wrap break-words rounded bg-red-50 p-3 font-mono text-xs text-red-900 dark:bg-red-950/30 dark:text-red-100">{detail.error}</p>}
+          {detail.facts.length > 0 && (
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+              {detail.facts.map((f) => (<div key={f.label} className="contents"><dt className="opacity-70">{f.label}</dt><dd className="break-words">{f.value}</dd></div>))}
+            </dl>
+          )}
+          {detail.lists.map((l) => (
+            <div key={l.label}>
+              <p className="text-xs font-semibold uppercase tracking-wide opacity-70">{l.label}</p>
+              <ul className="mt-1 flex flex-wrap gap-2">{l.items.map((i) => <li key={i} className="rounded-full border border-black/15 px-2.5 py-0.5 dark:border-white/20">{i}</li>)}</ul>
+            </div>
+          ))}
+          {detail.runs.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide opacity-70">Runs</p>
+              <ul className="mt-1 space-y-0.5">{detail.runs.map((r, i) => <li key={i}>{r.startedAt} · {r.status} · {r.duration}</li>)}</ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -103,6 +163,8 @@ export function PipelineTunnel({ articleId, initial }: { articleId: string; init
   const [error, setError] = useState<string | null>(null);
 
   const inflight = useRef<AbortController | null>(null);
+  const [open, setOpen] = useState<PipelineStep["key"] | null>(null);
+  const [detail, setDetail] = useState<StageDetail | null>(null);
 
   /** Fetch the latest status. A newer request cancels an older one still in flight. */
   const load = useCallback(async () => {
@@ -118,6 +180,18 @@ export function PipelineTunnel({ articleId, initial }: { articleId: string; init
   }, [articleId]);
 
   useEffect(() => () => inflight.current?.abort(), []);
+
+  // Load the chosen stage's details, and again whenever the article changes under it.
+  const changedAt = status.item?.updatedAt;
+  useEffect(() => {
+    if (!open) return;
+    const ctrl = new AbortController();
+    fetch(`/api/articles/${articleId}/pipeline/${open}`, { cache: "no-store", signal: ctrl.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<StageDetail>) : null))
+      .then((d) => { if (!ctrl.signal.aborted) setDetail(d); })
+      .catch(() => undefined);
+    return () => ctrl.abort();
+  }, [open, articleId, changedAt]);
 
   // Refetch when the server says this article changed, and after a reconnect (null).
   useLive((e) => {
@@ -152,9 +226,10 @@ export function PipelineTunnel({ articleId, initial }: { articleId: string; init
     <div className="space-y-4">
       <ol className="flex flex-col md:flex-row" aria-label="Pipeline stages">
         {steps.map((s, i) => (
-          <Step key={s.key} step={s} index={i} total={steps.length} prev={i > 0 ? steps[i - 1].state : null} />
+          <Step key={s.key} step={s} index={i} total={steps.length} prev={i > 0 ? steps[i - 1].state : null} selected={open === s.key} onSelect={() => { setDetail(null); setOpen(open === s.key ? null : s.key); }} />
         ))}
       </ol>
+      {open && <StageDetailPanel detail={detail} label={steps.find((s) => s.key === open)?.label ?? ""} />}
       <p className="text-sm" role="status" aria-live="polite">{summarize(steps)}</p>
 
       {canRestart && item && (
