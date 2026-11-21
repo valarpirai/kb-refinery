@@ -1,28 +1,19 @@
-## This app's own notes
+# KB Refinery
 
-- [`.claude/rules/kb-refinery-domain.md`](.claude/rules/kb-refinery-domain.md)
-  — app-specific findings (this app's own schema/business-logic/tooling-
-  config gotchas), as opposed to the generic platform knowledge in
-  `AIUX_CLAUDE.md`'s copied `rules/` files below. Add new app-specific
-  findings here, not to the copied files.
+Finds what is wrong with knowledge base articles and rewrites them for AI use. Next.js 15, Tailwind 4, Prisma 6, PostgreSQL, pg-boss, Ollama.
 
-## AIUX_CLAUDE.md
-- `AIUX_CLAUDE.md` and the `.claude/rules/{environment-build-deploy,
-  widget-and-page-conventions,pages-and-router,glide-platform-facts,
-  karuna-component-integration}.md` files it indexes are a **copy of a
-  shared, portable template** (from the `aiux_claude` source repo) —
-  generic AIUX/Now-SDK/Fluent/karuna platform knowledge, not this
-  project's own notes.
-- **Don't add this app's own findings to those files.** A fact about
-  this app's own schema, business logic, or known issues belongs in
-  this project's own `CLAUDE.md` and its own `.claude/rules/<this-
-  app>-domain.md` file (create one if it doesn't exist) — not in the
-  copied files above.
-- **Exception**: a fact you've verified is genuinely generic — true
-  for *any* AIUX app, not just this one (a platform/tooling behavior,
-  a karuna component's actual source-level behavior) — can go into the
-  relevant copied file directly, following its existing structure and
-  verification standard. Even then, tell the user it's worth
-  upstreaming into the source `aiux_claude` template repo: this is a
-  local copy that won't sync back on its own, and a good finding made
-  here is easy to lose track of otherwise.
+Docs are in `docs/`. Start at `docs/index.md`.
+
+## Rules
+
+- Use pnpm for everything. Never npm or yarn.
+- Two processes run the app: `pnpm dev` (web) and `pnpm worker` (pipeline and scheduled pulls). Pipeline and pull changes need the worker restarted. It does not hot reload.
+- The web server never calls the LLM. Only the worker does.
+- Schema lives in `prisma/schema.prisma`. After editing it, run `pnpm db:migrate`.
+- Prompts are rows in `PromptTemplate`, seeded from `prisma/seed/prompts/*.md`. Edit the file, then run `pnpm db:seed`.
+- Check types with `pnpm exec tsc --noEmit` and lint with `pnpm lint` before committing.
+- Keep each doc under 250 lines. Split instead of growing one.
+
+## Origin
+
+Ported from a ServiceNow AIUX app. That code is in git history on `main`. Chat, ask and the eval scorer were not ported.

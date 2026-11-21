@@ -1,8 +1,8 @@
 allowBuilds:
-  '@parcel/watcher': true
-  '@swc/core': true
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
   esbuild: true
-  libxmljs2: true
-  onnxruntime-node: true
-  protobufjs: true
   sharp: true
+  '@tailwindcss/oxide': true
+  unrs-resolver: true

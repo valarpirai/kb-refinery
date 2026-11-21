@@ -12,7 +12,6 @@ This is how to set the app up and run it. Use pnpm for everything. Do not use np
 ## First-time setup
 
 ```bash
-cd web
 pnpm install
 cp .env.example .env
 psql -U postgres -h localhost -c "CREATE DATABASE kb_refinery"
@@ -23,7 +22,7 @@ ollama pull qwen3:4b-thinking-2507-q4_K_M
 
 ## Environment
 
-All settings live in `web/.env`. The file is not committed. `.env.example` is.
+All settings live in `.env`. The file is not committed. `.env.example` is.
 
 | Variable | Default | Meaning |
 |---|---|---|
