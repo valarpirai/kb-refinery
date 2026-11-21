@@ -16,7 +16,7 @@ It is a small tool-using assistant, not a free-roaming one. It can only call the
 | `start_refine` | Starts a refine job for an import or for article ids. Returns at once. |
 | `restart_failed` | Queues articles whose latest run failed, from the stage that failed. Finds them itself. |
 | `get_job_status` | Reports a job's status and the count per stage. |
-| `get_stats` | Reports article counts, stages, open findings, average scores, top products. |
+| `get_stats` | Reports article counts, stages, failed articles with their titles, open findings, average scores, top products. |
 | `search_articles` | Finds articles by title words. |
 
 The code is in `src/lib/agent/tools.ts`. The list shown to people is in `src/lib/agent/catalog.ts`.

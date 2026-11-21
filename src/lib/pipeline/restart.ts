@@ -27,3 +27,25 @@ export async function restartJobItem(itemId: string, fromStage?: Stage): Promise
   await (await getBoss()).send(REFINE_QUEUE, { jobItemId: itemId, fromStage: from }, { priority: 10 });
   return { ok: true, fromStage: from };
 }
+
+/**
+ * Find articles whose latest refine run failed.
+ * Takes the newest failed item per article and drops any article that a later run has fixed or restarted.
+ * @param limit most articles to return
+ * @return failed items with their article title, newest first
+ */
+export async function listFailedItems(limit: number) {
+  const failed = await db.jobItem.findMany({
+    where: { status: "failed" },
+    orderBy: { updatedAt: "desc" },
+    distinct: ["articleId"],
+    include: { article: { select: { title: true } } },
+  });
+  const current: typeof failed = [];
+  for (const item of failed) {
+    if (current.length >= limit) break;
+    const newer = await db.jobItem.count({ where: { articleId: item.articleId, status: { not: "failed" }, updatedAt: { gt: item.updatedAt } } });
+    if (newer === 0) current.push(item);
+  }
+  return current;
+}

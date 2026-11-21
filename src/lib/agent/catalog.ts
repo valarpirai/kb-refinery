@@ -11,7 +11,7 @@ export const TOOL_CATALOG: ToolInfo[] = [
   { name: "start_refine", label: "Start refining", summary: "Starts a refine job for an import or for article ids. Returns at once." },
   { name: "restart_failed", label: "Restart failed articles", summary: "Queues articles whose latest run failed, from the stage that failed." },
   { name: "get_job_status", label: "Check a job", summary: "Reports a job's status and the count per stage." },
-  { name: "get_stats", label: "Look up statistics", summary: "Reports article counts, stages, open findings, average scores and top products." },
+  { name: "get_stats", label: "Look up statistics", summary: "Reports article counts, stages, failed articles, open findings, average scores and top products." },
   { name: "search_articles", label: "Search articles", summary: "Finds articles by title words." },
 ];
 

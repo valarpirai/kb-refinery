@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { runImport } from "@/lib/ingest/import";
 import { createJob } from "@/lib/pipeline/jobs";
-import { restartJobItem } from "@/lib/pipeline/restart";
+import { listFailedItems, restartJobItem } from "@/lib/pipeline/restart";
 import { crawl } from "./crawl";
 
 export interface ToolContext {
@@ -90,19 +90,10 @@ export function buildTools(ctx: ToolContext, enabled?: string[]) {
       limit: z.number().int().min(1).max(50).default(25).describe("Most articles to queue. Leave it out unless the user names a number."),
     }),
     callback: async ({ limit }) => {
-      // Newest failed item per article, skipping any article that a later run has since fixed or restarted.
-      const failed = await db.jobItem.findMany({
-        where: { status: "failed" },
-        orderBy: { updatedAt: "desc" },
-        distinct: ["articleId"],
-        take: limit,
-        include: { article: { select: { title: true } } },
-      });
+      const failed = await listFailedItems(limit);
       const queued: { title: string; from_stage: string; job_id: string }[] = [];
       const skipped: string[] = [];
       for (const item of failed) {
-        const newer = await db.jobItem.count({ where: { articleId: item.articleId, status: { not: "failed" }, updatedAt: { gt: item.updatedAt } } });
-        if (newer > 0) continue;
         const r = await restartJobItem(item.id);
         if (r.ok) queued.push({ title: item.article.title, from_stage: r.fromStage, job_id: item.jobId });
         else skipped.push(`${item.article.title}: ${r.error}`);
@@ -134,10 +125,11 @@ export function buildTools(ctx: ToolContext, enabled?: string[]) {
     name: "get_stats",
     description:
       "Get statistics about the knowledge base: article counts, how many are refined, open findings by severity, average quality scores before and after refining, " +
-      "top products, recent jobs, and chat comparison results. Use it for any question about numbers or overall quality.",
+      "top products, recent jobs, chat comparison results, and the articles that failed refining (title, stage it failed at, error). " +
+      "analysis_pipeline_stage counts articles by where they are now; the stage a failure happened at is failed_at_stage in failed_articles. Use it for any question about numbers, quality or failures.",
     inputSchema: z.object({}),
     callback: async () => {
-      const [articles, byStage, findings, scores, products, jobs, indexed, verdicts] = await Promise.all([
+      const [articles, byStage, findings, scores, products, jobs, indexed, verdicts, failedItems] = await Promise.all([
         db.article.count(),
         db.analysis.groupBy({ by: ["pipelineStage"], _count: true }),
         db.finding.groupBy({ by: ["severity"], where: { state: "new" }, _count: true }),
@@ -146,11 +138,13 @@ export function buildTools(ctx: ToolContext, enabled?: string[]) {
         db.job.groupBy({ by: ["status"], _count: true }),
         db.chunk.groupBy({ by: ["variant"], _count: true }),
         db.comparison.groupBy({ by: ["verdict"], where: { conversation: { userId: ctx.userId }, verdict: { not: null } }, _count: true }),
+        listFailedItems(10),
       ]);
       const round = (n: number | null | undefined) => (n == null ? null : Math.round(n));
       return json({
         articles,
-        analysis_stages: Object.fromEntries(byStage.map((s) => [s.pipelineStage, s._count])),
+        analysis_pipeline_stage: Object.fromEntries(byStage.map((s) => [s.pipelineStage, s._count])),
+        failed_articles: failedItems.map((i) => ({ article_id: i.articleId, title: i.article.title, failed_at_stage: i.failedStage ?? "unknown", error: (i.message ?? "").slice(0, 200) })),
         open_findings_by_severity: Object.fromEntries(findings.map((f) => [f.severity ?? "unrated", f._count])),
         average_scores: Object.fromEntries(scores.map((s) => [s.type, { mechanical: round(s._avg.score), model: round(s._avg.llmScore) }])),
         top_products: products,
