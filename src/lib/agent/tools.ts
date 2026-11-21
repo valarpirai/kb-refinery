@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { runImport } from "@/lib/ingest/import";
 import { createJob } from "@/lib/pipeline/jobs";
+import { restartJobItem } from "@/lib/pipeline/restart";
 import { crawl } from "./crawl";
 
 export interface ToolContext {
@@ -20,9 +21,10 @@ const json = (value: unknown) => JSON.stringify(value);
 /**
  * The tools the refinery agent can call. Each one is bound to the signed-in user.
  * @param ctx who the agent is working for
+ * @param enabled tool names the agent may call; omit for all of them
  * @return Strands tools
  */
-export function buildTools(ctx: ToolContext) {
+export function buildTools(ctx: ToolContext, enabled?: string[]) {
   const importFromUrl = tool({
     name: "import_from_url",
     description:
@@ -76,6 +78,37 @@ export function buildTools(ctx: ToolContext) {
       if (!ids || ids.length === 0) return json({ ok: false, error: "Nothing to refine. Give an import_run_id with new or changed articles, or article_ids." });
       const job = await createJob(ids, `${ids.length} article(s) started by the agent`, ctx.userId);
       return json({ ok: true, job_id: job.id, articles: ids.length, note: "Running in the background. The user will be notified when it finishes." });
+    },
+  });
+
+  const restartFailed = tool({
+    name: "restart_failed",
+    description:
+      "Queue articles whose latest refine run failed to run again, from the stage that failed. Use it when the user asks to refine, retry or restart failed articles. " +
+      "No input needed: it finds them itself. Returns the titles it queued. The user is notified when the job finishes.",
+    inputSchema: z.object({
+      limit: z.number().int().min(1).max(50).default(25).describe("Most articles to queue. Leave it out unless the user names a number."),
+    }),
+    callback: async ({ limit }) => {
+      // Newest failed item per article, skipping any article that a later run has since fixed or restarted.
+      const failed = await db.jobItem.findMany({
+        where: { status: "failed" },
+        orderBy: { updatedAt: "desc" },
+        distinct: ["articleId"],
+        take: limit,
+        include: { article: { select: { title: true } } },
+      });
+      const queued: { title: string; from_stage: string; job_id: string }[] = [];
+      const skipped: string[] = [];
+      for (const item of failed) {
+        const newer = await db.jobItem.count({ where: { articleId: item.articleId, status: { not: "failed" }, updatedAt: { gt: item.updatedAt } } });
+        if (newer > 0) continue;
+        const r = await restartJobItem(item.id);
+        if (r.ok) queued.push({ title: item.article.title, from_stage: r.fromStage, job_id: item.jobId });
+        else skipped.push(`${item.article.title}: ${r.error}`);
+      }
+      if (queued.length === 0 && skipped.length === 0) return json({ ok: true, queued: 0, note: "No failed articles to restart." });
+      return json({ ok: true, queued: queued.length, articles: queued, skipped, note: "Running in the background. The user will be notified when it finishes." });
     },
   });
 
@@ -147,5 +180,6 @@ export function buildTools(ctx: ToolContext) {
     },
   });
 
-  return [importFromUrl, startRefine, jobStatus, getStats, searchArticles];
+  const all = [importFromUrl, startRefine, restartFailed, jobStatus, getStats, searchArticles];
+  return enabled ? all.filter((t) => enabled.includes(t.name)) : all;
 }

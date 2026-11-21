@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { buildSystemPrompt } from "../src/lib/agent/prompt";
 import { auth } from "../src/lib/auth";
 import { articles, incidents, products } from "./seed/data";
 
@@ -14,6 +15,36 @@ async function seedPrompts() {
     const name = file.replace(/\.md$/, "");
     const template = fs.readFileSync(path.join(dir, file), "utf8");
     await db.promptTemplate.upsert({ where: { name }, create: { name, template }, update: { template } });
+  }
+}
+
+/**
+ * Load each agent markdown file into Agent, keyed by file name.
+ * The header holds name, description and tools. The body has "## Role", "## Rules" (a list)
+ * and "## Tool notes" (one "### tool_name" block per tool).
+ * An agent that already exists is left alone, so edits made in the app survive a re-seed.
+ */
+async function seedAgents() {
+  const dir = path.join(__dirname, "seed", "agents");
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith(".md"))) {
+    const slug = file.replace(/\.md$/, "");
+    const raw = fs.readFileSync(path.join(dir, file), "utf8");
+    const m = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    if (!m) throw new Error(`${file}: expected a header between --- lines`);
+    const head = Object.fromEntries(m[1].split("\n").map((l) => [l.slice(0, l.indexOf(":")).trim(), l.slice(l.indexOf(":") + 1).trim()]));
+    const section = (title: string) => (m[2].match(new RegExp(`^## ${title}\\n([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, "m"))?.[1] ?? "").trim();
+    const rules = section("Rules").split("\n").filter((l) => l.startsWith("- ")).map((l) => l.slice(2).trim());
+    const toolNotes: Record<string, string> = {};
+    for (const n of section("Tool notes").split(/^### /m).filter(Boolean)) {
+      const [name, ...body] = n.split("\n");
+      toolNotes[name.trim()] = body.join("\n").trim();
+    }
+    const parts = { role: section("Role"), rules, toolNotes, tools: (head.tools ?? "").split(",").map((t) => t.trim()).filter(Boolean) };
+    await db.agent.upsert({
+      where: { slug },
+      create: { slug, name: head.name, description: head.description ?? "", ...parts, prompt: buildSystemPrompt(parts) },
+      update: {},
+    });
   }
 }
 
@@ -156,6 +187,7 @@ async function seedAdmin() {
 async function main() {
   await seedAdmin();
   await seedPrompts();
+  await seedAgents();
   await seedCatalog();
   await seedDemoRun();
   console.log("Seed complete");

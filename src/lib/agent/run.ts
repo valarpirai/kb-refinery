@@ -9,20 +9,7 @@ const FLUSH_MS = 400;
 const HISTORY_LIMIT = 12;
 const MAX_TOOL_OUTPUT = 2000;
 
-const SYSTEM_PROMPT = `You are the KB Refinery agent. KB Refinery finds problems in knowledge base articles and rewrites them so AI agents can use them.
-
-You can:
-- import articles from a website (import_from_url), then refine them (start_refine)
-- check a refine job (get_job_status)
-- report statistics (get_stats) and look up articles (search_articles)
-
-Rules:
-- Use tools to get facts. Never invent numbers, article titles or job results.
-- When the user gives a website or URL to import: call import_from_url with just the url (it fetches the linked pages too; only set only_this_page when the user asks for one page), then call start_refine with the import_run_id it returns. Then tell the user what was imported and that refining runs in the background and they will get a notification when it finishes.
-- Refining is slow. Never wait for it. Do not call get_job_status in a loop.
-- For questions about numbers or quality, call get_stats first, then answer from its result.
-- If a tool returns ok:false, say what went wrong in plain words and what the user can try.
-- Keep answers short and concrete. Use a short list when giving several numbers.`;
+const AGENT_SLUG = "refinery";
 
 type ToolCall = {
   id: string;
@@ -93,10 +80,14 @@ export async function runAgentMessage(assistantId: string): Promise<void> {
     };
 
     try {
+      // Read the agent on every run, so a saved edit applies to the next message. The prompt was built when it was saved.
+      const config = await db.agent.findUnique({ where: { slug: AGENT_SLUG } });
+      if (!config) throw new Error(`Agent "${AGENT_SLUG}" is not set up. Run pnpm db:seed.`);
+      if (!config.prompt.trim()) throw new Error(`Agent "${AGENT_SLUG}" has no prompt yet. Open it on the Agents page and save.`);
       const agent = new Agent({
         model: makeModel(),
-        tools: buildTools({ userId: message.conversation.userId }),
-        systemPrompt: SYSTEM_PROMPT,
+        tools: buildTools({ userId: message.conversation.userId }, config.tools),
+        systemPrompt: config.prompt,
         messages: history,
         printer: false,
       });

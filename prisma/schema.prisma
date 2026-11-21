@@ -407,6 +407,21 @@ model PromptTemplate {
   updatedAt DateTime @updatedAt
 }
 
+/// An agent the worker can run. The parts are edited in the app. Saving builds `prompt` from them, and the worker runs that stored prompt.
+model Agent {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  name         String
+  description  String   @default("")
+  role         String // who the agent is. The first part of the prompt.
+  rules        String[] // one rule per entry, in order
+  tools        String[] // names from the tool catalog the agent may call
+  toolNotes    Json     @default("{}") // when to use each tool, keyed by tool name
+  prompt       String   @default("") // the full system prompt, built from the parts above when the agent is saved
+  updatedAt    DateTime @updatedAt
+  updatedById  String?
+}
+
 // ---------------------------------------------------------------------------
 // Chat comparison: ask one question against original and refined content
 // ---------------------------------------------------------------------------

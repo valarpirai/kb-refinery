@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Agent" ALTER COLUMN "rules" DROP DEFAULT;
