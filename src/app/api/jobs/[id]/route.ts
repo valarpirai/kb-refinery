@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getUser, unauthorized } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** GET: one job with its per-article items. Polled by the job page for live progress. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await getUser())) return unauthorized();
   const { id } = await params;
   const job = await db.job.findUnique({
     where: { id },

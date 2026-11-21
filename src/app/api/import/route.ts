@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runImport } from "@/lib/ingest/import";
 import type { UploadKind } from "@/lib/ingest/types";
+import { getUser, unauthorized } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -9,6 +10,7 @@ const MAX_BYTES = 10 * 1024 * 1024;
 
 /** POST multipart form: `kind` ("articles" | "incidents") and one or more `files`. */
 export async function POST(req: Request) {
+  if (!(await getUser())) return unauthorized();
   const form = await req.formData();
   const kind = form.get("kind");
   if (kind !== "articles" && kind !== "incidents") {

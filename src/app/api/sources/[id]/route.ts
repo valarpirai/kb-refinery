@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { syncSchedule } from "@/lib/ingest/schedule";
 import { redact } from "@/lib/ingest/sources";
+import { getUser, unauthorized } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -14,6 +15,7 @@ const patchBody = z.object({
 
 /** PATCH: change name, schedule or enabled flag. To change the connection, delete and re-add. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await getUser())) return unauthorized();
   const { id } = await params;
   const body = patchBody.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
@@ -32,6 +34,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 /** DELETE: remove the source and its schedule. Imported articles stay. */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await getUser())) return unauthorized();
   const { id } = await params;
   const existing = await db.dataSource.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });

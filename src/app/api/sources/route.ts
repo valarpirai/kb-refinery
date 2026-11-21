@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { configSchemas } from "@/lib/ingest/connectors";
 import { syncSchedule } from "@/lib/ingest/schedule";
 import { redact } from "@/lib/ingest/sources";
+import { getUser, unauthorized } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -17,12 +18,14 @@ const createBody = z.object({
 
 /** GET: all data sources, newest first, with secrets removed. */
 export async function GET() {
+  if (!(await getUser())) return unauthorized();
   const sources = await db.dataSource.findMany({ orderBy: { createdAt: "desc" } });
   return NextResponse.json(sources.map(redact));
 }
 
 /** POST: create a data source and, when it has a cron expression, schedule it. */
 export async function POST(req: Request) {
+  if (!(await getUser())) return unauthorized();
   const body = createBody.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: body.error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
   const { name, type, cron, enabled } = body.data;
