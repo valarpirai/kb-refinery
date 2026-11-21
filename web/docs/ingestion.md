@@ -61,6 +61,45 @@ A bad file or row does not stop the rest. The run records each problem. The page
 | `src/app/api/import/route.ts` | The upload endpoint |
 | `src/components/upload-form.tsx` | The upload form |
 
-## Planned: integrations
+## Integrations: scheduled pulls
 
-An Integrations page will let you connect an outside source and pull on a schedule. The `DataSource` table is ready. First connectors: a REST or JSON endpoint, and a URL crawl. Pulls will run through the same queue as the pipeline, and use the same import service.
+Go to `/integrations`. Add a source. The worker pulls it on its schedule and imports with the same service as uploads.
+
+### Connectors
+
+| Type | Config | Pulls |
+|---|---|---|
+| REST / JSON | `url`, optional `itemsPath`, `kind`, `authHeader` | One GET. The response, or the list at `itemsPath`, is read like a JSON upload. |
+| Web pages | `urls` (up to 100), optional `authHeader` | Each page is fetched and read like an HTML upload. |
+
+`itemsPath` is a dot path such as `result` or `data.items`. Empty means the response itself is the list.
+
+### Matching on re-pull
+
+Each source keeps its own articles. An item matches on its id. With no id, it matches on its title. A page pulled by URL matches on a name made from the URL. So a repeat pull updates or skips. It does not pile up copies.
+
+### Schedules
+
+A schedule is a cron expression, for example `0 2 * * *` for daily at 02:00. Leave it empty for manual pulls only. The cron runs in the queue (`pg-boss`), one schedule per source. The worker re-applies every schedule when it starts.
+
+Pause stops the schedule. Resume restores it. Run now queues one pull. Both need the worker running.
+
+### Results
+
+Each pull makes an import run, shown on the source row and in import history. A bad row or a dead URL is recorded and the rest still import. A page that fails to load does not stop the other pages.
+
+### Safety
+
+- Only `http` and `https` URLs are fetched. Time limit is 30 seconds. Size limit is 5 MB.
+- The server fetches whatever URL you give it, including addresses on your own network. There is no login on this app, so run it only on a machine you trust.
+- The authorization header is saved as plain text in your local database. The API never returns it. The page shows only that one is set.
+- To change a source's connection, delete it and add it again.
+
+### Where the code is
+
+| File | Job |
+|---|---|
+| `src/lib/ingest/connectors.ts` | Fetches a source and runs the import |
+| `src/lib/ingest/schedule.ts` | Keeps queue schedules in step with the table |
+| `src/app/api/sources/` | Create, update, delete, run now |
+| `src/app/integrations/page.tsx` | The page |

@@ -1,5 +1,7 @@
 import { db } from "@/lib/db";
-import { getBoss, REFINE_QUEUE } from "@/lib/queue";
+import { pullSource } from "@/lib/ingest/connectors";
+import { syncAllSchedules } from "@/lib/ingest/schedule";
+import { getBoss, PULL_QUEUE, REFINE_QUEUE } from "@/lib/queue";
 import { processJobItem } from "./run-article";
 
 const BATCH_SIZE = 5;
@@ -69,5 +71,9 @@ export async function startWorker(): Promise<void> {
       await finalizeJobIfDone(item.jobId);
     }
   });
-  console.log("[worker] listening on", REFINE_QUEUE);
+  await boss.work<{ dataSourceId: string }>(PULL_QUEUE, async (jobs) => {
+    for (const j of jobs) await pullSource(j.data.dataSourceId);
+  });
+  await syncAllSchedules();
+  console.log("[worker] listening on", REFINE_QUEUE, "and", PULL_QUEUE);
 }

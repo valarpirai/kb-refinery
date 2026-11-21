@@ -23,7 +23,7 @@ KB Refinery reads knowledge base articles, finds what is wrong with them, and re
 | Pipeline and worker | Done, tested on one article |
 | Jobs API | Done |
 | Pages: home, jobs, job detail, report | Done. Not checked in a browser. |
-| Integrations page and scheduled pulls | Not built |
+| Integrations page and scheduled pulls | Done. Tested with a local feed. |
 | Chat, ask, eval scorer | Not built |
 
 ## Origin

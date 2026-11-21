@@ -18,8 +18,10 @@ type Outcome = "created" | "updated" | "skipped";
 
 /** Insert an article, update it when its content changed, or skip an identical one. */
 async function upsertArticle(a: ParsedArticle, dataSourceId: string | null, importRunId: string): Promise<Outcome> {
-  const existing = a.externalId
-    ? await db.article.findFirst({ where: { externalId: a.externalId, dataSourceId } })
+  // A pulled item with no id is matched by title, so a scheduled pull does not re-create it every time.
+  const externalId = a.externalId ?? (dataSourceId ? a.title : undefined);
+  const existing = externalId
+    ? await db.article.findFirst({ where: { externalId, dataSourceId } })
     : null;
   const data = {
     title: a.title,
@@ -30,7 +32,7 @@ async function upsertArticle(a: ParsedArticle, dataSourceId: string | null, impo
     sourceUpdatedAt: a.sourceUpdatedAt ?? null,
   };
   if (!existing) {
-    await db.article.create({ data: { ...data, externalId: a.externalId, dataSourceId, importRunId } });
+    await db.article.create({ data: { ...data, externalId, dataSourceId, importRunId } });
     return "created";
   }
   if (existing.title === data.title && existing.body === data.body && existing.format === data.format) return "skipped";

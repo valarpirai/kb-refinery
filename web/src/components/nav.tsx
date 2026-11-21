@@ -4,6 +4,7 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/jobs", label: "Jobs" },
   { href: "/import", label: "Import" },
+  { href: "/integrations", label: "Integrations" },
 ];
 
 /** Top navigation bar shared by every page. */

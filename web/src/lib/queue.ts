@@ -1,6 +1,7 @@
 import { PgBoss } from "pg-boss";
 
 export const REFINE_QUEUE = "refine-article";
+export const PULL_QUEUE = "pull-source";
 
 const globalForBoss = globalThis as unknown as { boss?: Promise<PgBoss> };
 
@@ -25,6 +26,7 @@ export function getBoss(): Promise<PgBoss> {
     boss.on("error", (e) => console.error("[pg-boss]", e));
     await boss.start();
     await boss.createQueue(REFINE_QUEUE);
+    await boss.createQueue(PULL_QUEUE);
     return boss;
   })();
   return globalForBoss.boss;

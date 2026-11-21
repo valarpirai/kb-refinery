@@ -9,6 +9,7 @@ This is what each page shows and where its code lives.
 | `/jobs/[id]` | One job, live. Progress bar, count per status, one row per article. | `src/components/job-progress.tsx` |
 | `/analysis/[id]` | One article's report | `src/app/analysis/[id]/page.tsx` |
 | `/import` | Upload form and import history | `src/app/import/page.tsx` |
+| `/integrations` | Connect sources, set schedules, run now | `src/app/integrations/page.tsx` |
 
 ## Home
 

@@ -15,7 +15,7 @@ Job ──< JobItem >── Article
 
 | Table | Holds |
 |---|---|
-| `DataSource` | A configured outside source: type, config, cron, last run result. Not used by any page yet. |
+| `DataSource` | A configured outside source: type, config, cron, last run result. Managed on the Integrations page. |
 | `ImportRun` | One upload or one scheduled pull. Counts of created, updated, skipped. A list of errors. |
 | `Article` | A source article. Title, body, format, knowledge base, URL, external id. |
 | `Incident` | A support incident. Number, short description, resolution. Used as evidence. |
