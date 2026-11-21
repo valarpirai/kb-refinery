@@ -4,6 +4,7 @@ import type { DotStep } from "@/components/article-stage-dots";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { getPipelineStatus } from "@/lib/pipeline/status";
+import { requirePageUser } from "@/lib/session";
 import "./articles.css";
 
 export const dynamic = "force-dynamic";
@@ -100,6 +101,7 @@ async function latestScores(analysisIds: string[]): Promise<Map<string, Partial<
 }
 
 export default async function ArticlesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const user = await requirePageUser();
   const p = parse(await searchParams);
 
   const and: Prisma.ArticleWhereInput[] = [];
@@ -273,7 +275,7 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
           ) : (
             <>
               <p className="text-sm" aria-live="polite">Showing {from}–{to} of {total}</p>
-              <ArticleTable rows={rows} />
+              <ArticleTable rows={rows} canDelete={user.role === "admin"} />
               {last > 1 && (
                 <nav aria-label="Pagination" className="flex flex-wrap items-center gap-1 text-sm">
                   {page > 1 ? <Link href={href(p, { page: page - 1 })} rel="prev" className={btn}>Previous</Link> : <span className={`${btn} opacity-40`} aria-disabled="true">Previous</span>}

@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ArticleDeleteButton } from "@/components/article-delete-button";
 import { ArticleRefineButton } from "@/components/article-refine-button";
 import { ArticleTags } from "@/components/article-tags";
 import { db } from "@/lib/db";
+import { requirePageUser } from "@/lib/session";
 import { MAX_TAGS_PER_ARTICLE } from "@/lib/tags";
 import "../articles.css";
 
@@ -22,6 +24,7 @@ function safeUrl(url: string | null): string | null {
 }
 
 export default async function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
+  const user = await requirePageUser();
   const { id } = await params;
   const article = await db.article.findUnique({
     where: { id },
@@ -59,7 +62,10 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
 
       <div className="space-y-1">
         <p className="text-sm opacity-80">This article has not been refined yet.</p>
-        <ArticleRefineButton articleIds={[article.id]} />
+        <div className="flex flex-wrap items-center gap-3">
+          <ArticleRefineButton articleIds={[article.id]} />
+          {user.role === "admin" && <ArticleDeleteButton articleIds={[article.id]} title={article.title} redirectTo="/articles" />}
+        </div>
       </div>
     </div>
   );

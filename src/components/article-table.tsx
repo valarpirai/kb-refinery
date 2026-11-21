@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ArticleStageDots, type DotStep } from "@/components/article-stage-dots";
+import { ArticleDeleteButton } from "@/components/article-delete-button";
 import { ArticleTags, type TagItem } from "@/components/article-tags";
 import { StatusPill } from "@/components/status-pill";
 import { statusClass } from "@/lib/format";
@@ -22,7 +23,7 @@ export interface ArticleRow {
 }
 
 /** The articles list as a table on wide screens and as cards on narrow ones, with row selection and a bulk "Refine" bar. */
-export function ArticleTable({ rows }: { rows: ArticleRow[] }) {
+export function ArticleTable({ rows, canDelete = false }: { rows: ArticleRow[]; canDelete?: boolean }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -68,6 +69,7 @@ export function ArticleTable({ rows }: { rows: ArticleRow[] }) {
             <button type="button" onClick={refine} disabled={busy} className="art-press art-hover-solid rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
               {busy ? "Starting…" : `Refine selected (${selected.size})`}
             </button>
+            {canDelete && <ArticleDeleteButton articleIds={[...selected]} label={`Delete (${selected.size})`} onDone={() => setSelected(new Set())} />}
             <button type="button" onClick={() => setSelected(new Set())} className="art-hover art-press rounded border border-black/15 px-3 py-1.5 dark:border-white/20">Clear selection</button>
           </>
         )}

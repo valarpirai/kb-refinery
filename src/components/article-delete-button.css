@@ -1,0 +1,26 @@
+/* Delete confirmation. Seen rarely, so a modal-length fade and a small scale are fine. */
+.del-backdrop {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  transition: opacity 200ms var(--ease-out);
+}
+.del-backdrop[data-starting-style],
+.del-backdrop[data-ending-style] {
+  opacity: 0;
+}
+.del-popup {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+.del-popup[data-starting-style],
+.del-popup[data-ending-style] {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.96);
+}
+@media (prefers-reduced-motion: reduce) {
+  .del-popup[data-starting-style],
+  .del-popup[data-ending-style] {
+    transform: translate(-50%, -50%);
+  }
+}

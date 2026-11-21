@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArticleDeleteButton } from "@/components/article-delete-button";
 import { PipelineTunnel } from "@/components/pipeline-tunnel";
 import { ContentViewer, type Version } from "@/components/content-viewer";
 import { ScoreChart } from "@/components/score-chart";
@@ -7,6 +8,7 @@ import { StatusPill } from "@/components/status-pill";
 import { db } from "@/lib/db";
 import { label, severityClass } from "@/lib/format";
 import { getPipelineStatus } from "@/lib/pipeline/status";
+import { requirePageUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,7 @@ const ORDER = ["raw", "converted", "enriched"] as const;
 const STAGE_NAME = { raw: "Original", converted: "Converted", enriched: "Rewritten" } as const;
 
 export default async function AnalysisPage({ params }: { params: Promise<{ id: string }> }) {
+  const user = await requirePageUser();
   const { id } = await params;
   const analysis = await db.analysis.findUnique({
     where: { id },
@@ -52,6 +55,11 @@ export default async function AnalysisPage({ params }: { params: Promise<{ id: s
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold">{analysis.article.title}</h1>
           <StatusPill status={analysis.pipelineStage} />
+          {user.role === "admin" && (
+            <span className="ml-auto">
+              <ArticleDeleteButton articleIds={[analysis.articleId]} title={analysis.article.title} redirectTo="/articles" />
+            </span>
+          )}
         </div>
         <p className="mt-1 text-sm opacity-70">
           {analysis.article.knowledgeBase ?? "No knowledge base"} · Audience: {label(analysis.targetAudience) || "unknown"}
