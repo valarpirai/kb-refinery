@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { ownedComparison } from "@/lib/chat/access";
 import { getUser, unauthorized } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -13,19 +14,21 @@ const patchBody = z.object({
 
 /** GET: one comparison with both arms. The chat page polls this. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getUser())) return unauthorized();
+  const user = await getUser();
+  if (!user) return unauthorized();
   const { id } = await params;
-  const comparison = await db.comparison.findUnique({ where: { id }, include: { arms: true } });
+  const comparison = await ownedComparison(id, user.id);
   if (!comparison) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(comparison);
 }
 
 /** PATCH: record which answer you preferred, with an optional note. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getUser())) return unauthorized();
+  const user = await getUser();
+  if (!user) return unauthorized();
   const { id } = await params;
   const parsed = patchBody.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  if (!(await db.comparison.findUnique({ where: { id }, select: { id: true } }))) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!(await ownedComparison(id, user.id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(await db.comparison.update({ where: { id }, data: parsed.data, include: { arms: true } }));
 }

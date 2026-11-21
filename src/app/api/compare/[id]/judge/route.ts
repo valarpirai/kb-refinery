@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { ownedComparison } from "@/lib/chat/access";
 import { getBoss, JUDGE_QUEUE } from "@/lib/queue";
 import { getUser, unauthorized } from "@/lib/session";
 
@@ -7,12 +7,13 @@ export const runtime = "nodejs";
 
 /** POST: queue the auto-judge. It needs both answers to be finished. */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getUser())) return unauthorized();
+  const user = await getUser();
+  if (!user) return unauthorized();
   const { id } = await params;
-  const arms = await db.comparisonArm.findMany({ where: { comparisonId: id } });
-  if (arms.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const owned = await ownedComparison(id, user.id);
+  if (!owned) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const arms = owned.arms;
   if (arms.some((a) => a.status !== "completed")) return NextResponse.json({ error: "Both answers must finish first" }, { status: 409 });
-  await db.comparisonArm.updateMany({ where: { comparisonId: id }, data: { judge: undefined } });
   await (await getBoss()).send(JUDGE_QUEUE, { comparisonId: id });
   return NextResponse.json({ queued: true }, { status: 202 });
 }
