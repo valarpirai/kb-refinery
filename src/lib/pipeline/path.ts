@@ -97,7 +97,7 @@ export interface RefiningPath {
   /** Set when an article is chosen: its state at each step. Null shows the counts instead. */
   steps: Record<string, StepState> | null;
   /** The chosen article, if any. */
-  article: { id: string; title: string } | null;
+  article: { id: string; title: string; analysisId: string | null } | null;
   /** Size in bytes of the chosen article at each version. A version that does not exist yet is null. */
   sizes: { original: number | null; converted: number | null; rewritten: number | null } | null;
   /** True while the worker still has items in this job, so the page keeps refreshing. */
@@ -270,7 +270,7 @@ export async function getRefiningPath(articleId?: string): Promise<RefiningPath>
     selectedArticleId,
     here: chosen ? { stage: chosen.stage, label: chosen.label } : null,
     steps: chosen ? stepsFor(chosen.stage, item?.failedStage ?? null) : null,
-    article: chosen ? { id: chosen.id, title: chosen.title } : null,
+    article: chosen ? { id: chosen.id, title: chosen.title, analysisId: analysis?.id ?? null } : null,
     sizes: chosen
       ? {
           original: original ? Buffer.byteLength(original.body) : null,
