@@ -59,9 +59,17 @@ export interface ChatMessageData {
   createdAt: string;
 }
 
+/** An agent a person can pick for a new conversation. */
+export interface AgentOption {
+  slug: string;
+  name: string;
+  description: string;
+}
+
 export interface ConversationData {
   id: string;
   title: string;
+  agentSlug: string;
   comparisons: ComparisonData[];
   messages: ChatMessageData[];
 }

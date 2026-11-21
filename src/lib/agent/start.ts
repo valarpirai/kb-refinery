@@ -1,23 +1,29 @@
 import { db } from "@/lib/db";
 import { AGENT_QUEUE, getBoss } from "@/lib/queue";
 
+/** The agent used when none is chosen, including uploads and scheduled pulls. */
+export const DEFAULT_AGENT_SLUG = "refinery";
+
 /**
  * Add a user message to an agent conversation, create the pending reply, and queue the agent.
  * Starts a new conversation when none is given.
  * @param userId the owner
  * @param text what the user said
- * @param opts.conversationId an existing conversation of this user
+ * @param opts.conversationId an existing conversation of this user. It keeps the agent it started with.
+ * @param opts.agentSlug the agent for a new conversation; defaults to the refinery agent
  * @param opts.title title for a new conversation
  * @return ids the page needs to show and poll the reply
  */
-export async function startAgentTurn(userId: string, text: string, opts: { conversationId?: string; title?: string } = {}) {
+export async function startAgentTurn(userId: string, text: string, opts: { conversationId?: string; title?: string; agentSlug?: string } = {}) {
   let conversationId = opts.conversationId;
   if (conversationId) {
     const found = await db.conversation.findFirst({ where: { id: conversationId, userId }, select: { id: true } });
     if (!found) throw new Error("Conversation not found");
   } else {
+    const agentSlug = opts.agentSlug ?? DEFAULT_AGENT_SLUG;
+    if (!(await db.agent.findUnique({ where: { slug: agentSlug }, select: { id: true } }))) throw new Error("Agent not found");
     const title = opts.title ?? (text.length > 60 ? `${text.slice(0, 57)}…` : text);
-    conversationId = (await db.conversation.create({ data: { userId, title } })).id;
+    conversationId = (await db.conversation.create({ data: { userId, title, agentSlug } })).id;
   }
   const userMessage = await db.chatMessage.create({ data: { conversationId, role: "user", content: text, status: "completed" } });
   const assistant = await db.chatMessage.create({ data: { conversationId, role: "assistant", status: "pending" } });

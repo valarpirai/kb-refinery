@@ -40,6 +40,18 @@ The page shows a **Prompt preview** that updates as you type, before you save. W
 
 The prompt has no date. A stored prompt cannot keep one correct.
 
+### Adding an agent
+
+Admins see **New agent** on the Agents page. Give it a name, a description and a role. You can copy the rules and tools of an existing agent, or start with none. It opens on its edit page so you can tick tools and write rules. The server makes the URL name from the title and adds a number if it is taken.
+
+### Choosing an agent in chat
+
+In Agent mode the message box has an agent menu. Pick one before the first message. A conversation keeps its agent. To use another, start a new chat. The menu is locked once the conversation has messages.
+
+Uploads and scheduled pulls always use the `refinery` agent.
+
+If an agent is missing when a message runs, the reply says so and you can pick another in a new chat.
+
 The first copy comes from `prisma/seed/agents/*.md`. `pnpm db:seed` creates an agent that is missing. It never overwrites one that exists, so your edits survive a re-seed. To go back to the shipped copy, delete the row and seed again.
 
 The builder is `src/lib/agent/prompt.ts`.
@@ -113,6 +125,7 @@ Long prompts are cut to 8,000 characters per attribute before saving.
 | `src/lib/agent/catalog.ts` | The tool list shown to people |
 | `src/lib/agent/prompt.ts` | Builds the prompt from the parts. Used on save and in the preview |
 | `src/app/(app)/agents/` | The agent list and the edit page |
+| `src/app/api/agents/route.ts` | Create an agent. Admins only |
 | `src/app/api/agents/[slug]/route.ts` | Save an edit. Admins only |
 | `prisma/seed/agents/*.md` | The first copy of each agent |
 | `src/lib/agent/crawl.ts` | The site crawler |

@@ -9,8 +9,6 @@ const FLUSH_MS = 400;
 const HISTORY_LIMIT = 12;
 const MAX_TOOL_OUTPUT = 2000;
 
-const AGENT_SLUG = "refinery";
-
 type ToolCall = {
   id: string;
   name: string;
@@ -81,9 +79,10 @@ export async function runAgentMessage(assistantId: string): Promise<void> {
 
     try {
       // Read the agent on every run, so a saved edit applies to the next message. The prompt was built when it was saved.
-      const config = await db.agent.findUnique({ where: { slug: AGENT_SLUG } });
-      if (!config) throw new Error(`Agent "${AGENT_SLUG}" is not set up. Run pnpm db:seed.`);
-      if (!config.prompt.trim()) throw new Error(`Agent "${AGENT_SLUG}" has no prompt yet. Open it on the Agents page and save.`);
+      const slug = message.conversation.agentSlug;
+      const config = await db.agent.findUnique({ where: { slug } });
+      if (!config) throw new Error(`Agent "${slug}" does not exist. Pick another agent or run pnpm db:seed.`);
+      if (!config.prompt.trim()) throw new Error(`Agent "${slug}" has no prompt yet. Open it on the Agents page and save.`);
       const agent = new Agent({
         model: makeModel(),
         tools: buildTools({ userId: message.conversation.userId }, config.tools),

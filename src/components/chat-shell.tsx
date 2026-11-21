@@ -7,7 +7,7 @@ import { ChatComposer } from "@/components/chat-composer";
 import { ChatEmpty } from "@/components/chat-empty";
 import { ChatSidebar } from "@/components/chat-sidebar";
 import { ChatTurn, isBusy } from "@/components/chat-turn";
-import type { ChatMessageData, ChatMode, ComparisonData, ConversationData, ConversationItem, IndexStatus, Tally } from "@/app/(app)/chat/types";
+import type { AgentOption, ChatMessageData, ChatMode, ComparisonData, ConversationData, ConversationItem, IndexStatus, Tally } from "@/app/(app)/chat/types";
 
 interface Props {
   userName: string;
@@ -15,11 +15,12 @@ interface Props {
   initialConversations: ConversationItem[];
   initialActive: ConversationData | null;
   initialTally: Tally;
+  agents: AgentOption[];
   index: IndexStatus;
 }
 
 /** Sidebar, conversation and composer. Server props seed the state; after mount the client owns it. */
-export function ChatShell({ userName, isAdmin, initialConversations, initialActive, initialTally, index }: Props) {
+export function ChatShell({ userName, isAdmin, initialConversations, initialActive, initialTally, agents, index }: Props) {
   const router = useRouter();
   const activeId = useSearchParams().get("c");
 
@@ -28,6 +29,7 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
   const [tally, setTally] = useState(initialTally);
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<ChatMode>("agent");
+  const [pickedAgent, setPickedAgent] = useState(agents.find((a) => a.slug === "refinery")?.slug ?? agents[0]?.slug ?? "");
   const [blind, setBlind] = useState(true);
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +143,10 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
     : []
   ).map((x) => x.item);
 
+  // A conversation keeps the agent it started with. The picker only works before the first message.
+  const agentLocked = (active?.messages.length ?? 0) > 0;
+  const agentSlug = agentLocked && active ? active.agentSlug : pickedAgent;
+
   const busy = asking || (active?.messages.some(isAgentBusy) ?? false) || (active?.comparisons.some(isBusy) ?? false);
 
   async function sendAgent(text: string) {
@@ -149,7 +155,7 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
     setError(null);
     setAsking(true);
     try {
-      const res = await fetch("/api/agent/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: q, conversationId: active?.id }) });
+      const res = await fetch("/api/agent/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: q, conversationId: active?.id, agentSlug: pickedAgent || undefined }) });
       const json = (await res.json()) as { conversationId?: string; userMessageId?: string; assistantMessageId?: string; error?: string };
       if (!res.ok || !json.conversationId || !json.userMessageId || !json.assistantMessageId) return setError(json.error ?? "Could not send");
       const convId = json.conversationId;
@@ -161,7 +167,7 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
       setQuery("");
       setFresh((f) => new Set(f).add(userMsg.id).add(botMsg.id));
       scrollToRef.current = userMsg.id;
-      setActive((a) => (a && a.id === convId ? { ...a, messages: [...a.messages, userMsg, botMsg] } : { id: convId, title: q.slice(0, 80), comparisons: [], messages: [userMsg, botMsg] }));
+      setActive((a) => (a && a.id === convId ? { ...a, messages: [...a.messages, userMsg, botMsg] } : { id: convId, title: q.slice(0, 80), agentSlug: pickedAgent, comparisons: [], messages: [userMsg, botMsg] }));
       if (isNew) router.replace(`/chat?c=${convId}`, { scroll: false });
       void refreshList();
     } catch {
@@ -195,7 +201,7 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
       setQuery("");
       setFresh((f) => new Set(f).add(next.id));
       scrollToRef.current = next.id;
-      setActive((a) => (a && a.id === convId ? { ...a, comparisons: [...a.comparisons, next] } : { id: convId, title: q.slice(0, 80), comparisons: [next], messages: [] }));
+      setActive((a) => (a && a.id === convId ? { ...a, comparisons: [...a.comparisons, next] } : { id: convId, title: q.slice(0, 80), agentSlug: pickedAgent, comparisons: [next], messages: [] }));
       if (isNew) router.replace(`/chat?c=${convId}`, { scroll: false });
       void refreshList();
     } catch {
@@ -276,7 +282,7 @@ export function ChatShell({ userName, isAdmin, initialConversations, initialActi
           </div>
         </div>
 
-        <ChatComposer query={query} onQuery={setQuery} onSend={ask} busy={busy} mode={mode} onMode={setMode} blind={blind} onBlind={setBlind} error={error} inputRef={inputRef} />
+        <ChatComposer query={query} onQuery={setQuery} onSend={ask} busy={busy} mode={mode} onMode={setMode} agents={agents} agentSlug={agentSlug} onAgent={setPickedAgent} agentLocked={agentLocked} blind={blind} onBlind={setBlind} error={error} inputRef={inputRef} />
       </section>
     </div>
   );

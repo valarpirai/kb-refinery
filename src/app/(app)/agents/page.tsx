@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NewAgentForm } from "@/components/new-agent-form";
 import { db } from "@/lib/db";
 import { requirePageUser } from "@/lib/session";
 
@@ -16,6 +17,8 @@ export default async function AgentsPage() {
           The agents the worker can run. Each has a prompt and a set of tools. {user.role === "admin" ? "Open one to edit it." : "Only admins can edit them."}
         </p>
       </div>
+
+      {user.role === "admin" && <NewAgentForm agents={agents.map((a) => ({ slug: a.slug, name: a.name }))} />}
 
       {agents.length === 0 ? (
         <p className="text-sm opacity-70">No agents yet. Run <code>pnpm db:seed</code>.</p>

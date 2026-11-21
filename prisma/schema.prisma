@@ -579,6 +579,7 @@ model Conversation {
   id        String   @id @default(cuid())
   userId    String
   title     String
+  agentSlug String   @default("refinery") // which Agent answers in this conversation
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

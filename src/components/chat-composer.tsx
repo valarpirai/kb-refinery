@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, type RefObject } from "react";
-import type { ChatMode } from "@/app/(app)/chat/types";
+import type { AgentOption, ChatMode } from "@/app/(app)/chat/types";
 
 const MAX_HEIGHT = 192; // 8 lines of 24px
 
@@ -13,6 +13,11 @@ interface Props {
   busy: boolean;
   mode: ChatMode;
   onMode: (mode: ChatMode) => void;
+  agents: AgentOption[];
+  agentSlug: string;
+  onAgent: (slug: string) => void;
+  /** True once the conversation has messages. The agent can no longer change. */
+  agentLocked: boolean;
   blind: boolean;
   onBlind: (value: boolean) => void;
   error: string | null;
@@ -20,7 +25,7 @@ interface Props {
 }
 
 /** The message box pinned to the bottom of the chat. Enter sends, Shift+Enter adds a line. */
-export function ChatComposer({ query, onQuery, onSend, busy, mode, onMode, blind, onBlind, error, inputRef }: Props) {
+export function ChatComposer({ query, onQuery, onSend, busy, mode, onMode, agents, agentSlug, onAgent, agentLocked, blind, onBlind, error, inputRef }: Props) {
   const canSend = !busy && query.trim().length >= 3;
 
   useLayoutEffect(() => {
@@ -64,6 +69,14 @@ export function ChatComposer({ query, onQuery, onSend, busy, mode, onMode, blind
                   <button key={m} type="button" aria-pressed={mode === m} onClick={() => onMode(m)}>{label}</button>
                 ))}
               </div>
+              {mode === "agent" && agents.length > 0 && (
+                <label className="chat-agent-pick" title={agentLocked ? "A conversation keeps its agent. Start a new chat to use another." : agents.find((a) => a.slug === agentSlug)?.description || undefined}>
+                  <span className="sr-only">Agent</span>
+                  <select value={agentSlug} onChange={(e) => onAgent(e.target.value)} disabled={agentLocked}>
+                    {agents.map((a) => <option key={a.slug} value={a.slug}>{a.name}</option>)}
+                  </select>
+                </label>
+              )}
               {mode === "compare" && (
                 <label className="chat-switch" title="Hide which answer is original until you choose a verdict">
                   <input type="checkbox" role="switch" checked={blind} onChange={(e) => onBlind(e.target.checked)} />

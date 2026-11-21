@@ -11,7 +11,7 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
   const user = await requirePageUser();
   const { c } = await searchParams;
 
-  const [conversations, selected, verdicts, indexedArticles, analyzed] = await Promise.all([
+  const [conversations, selected, verdicts, indexedArticles, analyzed, agents] = await Promise.all([
     db.conversation.findMany({
       where: { userId: user.id },
       orderBy: { updatedAt: "desc" },
@@ -30,6 +30,7 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
     db.comparison.groupBy({ by: ["verdict"], where: { conversation: { userId: user.id } }, _count: true }),
     db.chunk.findMany({ distinct: ["articleId"], select: { articleId: true } }),
     db.analysis.count({ where: { pipelineStage: "ready" } }),
+    db.agent.findMany({ orderBy: { name: "asc" }, select: { slug: true, name: true, description: true } }),
   ]);
 
   const tally: Tally = { original: 0, refined: 0, tie: 0, neither: 0 };
@@ -44,6 +45,7 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
       initialConversations={JSON.parse(JSON.stringify(conversations)) as ConversationItem[]}
       initialActive={selected ? (JSON.parse(JSON.stringify(selected)) as ConversationData) : null}
       initialTally={tally}
+      agents={agents}
       index={{ indexed: indexedArticles.length, total: analyzed }}
     />
   );
