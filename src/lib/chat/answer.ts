@@ -1,6 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { chatJson } from "@/lib/pipeline/ollama";
+import { chatJson } from "@/lib/pipeline/llm";
 import { renderPrompt } from "@/lib/pipeline/prompts";
 import { chatAnswerSchema, judgeSchema } from "@/lib/pipeline/schemas";
 import { refinedFirst } from "./blind";

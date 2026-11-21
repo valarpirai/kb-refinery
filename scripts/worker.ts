@@ -1,9 +1,9 @@
-import { checkOllama } from "../src/lib/pipeline/ollama";
+import { checkLlm } from "../src/lib/pipeline/llm";
 import { initTracing } from "../src/lib/agent/tracing";
 import { startWorker } from "../src/lib/pipeline/jobs";
 
 async function main() {
-  const problem = await checkOllama();
+  const problem = await checkLlm();
   if (problem) console.warn(`[worker] warning: ${problem}`);
   initTracing();
   await startWorker();

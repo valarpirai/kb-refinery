@@ -4,7 +4,7 @@ import { indexArticle } from "@/lib/chat/indexer";
 import { toMarkdown } from "./convert";
 import { formatFindings, formatIncidents, jsonOrNone } from "./format";
 import { findCandidateIncidents } from "./incidents";
-import { chatJson } from "./ollama";
+import { chatJson } from "./llm";
 import { renderPrompt } from "./prompts";
 import { analysisSchema, CONTENT_GAP_TYPES, duplicateSchema, enrichmentSchema, scoreOnlySchema, synthesisSchema, type AnalysisResult } from "./schemas";
 import { scoreContent } from "./scorer";
