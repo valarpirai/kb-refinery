@@ -33,11 +33,17 @@ An article is unique by data source plus external id. When the data source is em
 | `Product` | A product name, with aliases and a count of articles that mention it. |
 | `Mention` | Links an analysis to a product, with a count. |
 | `Job` | One run. Coarse status and counters. |
-| `JobItem` | One article inside a job. Its own status. This drives live progress. |
+| `JobItem` | One article inside a job. Its own status, the stage it failed in, a heartbeat, which worker holds it, and how many times it was claimed. This drives live progress. |
 | `PromptTemplate` | An LLM prompt with `{{placeholder}}` slots. |
 | `Chunk` | A searchable piece of an article, per variant (original or refined), with its vector. |
 | `Comparison` | One chat question, with your verdict. |
 | `ComparisonArm` | One side's answer, sources, time and auto-judge score. |
+| `Conversation` | A saved chat. Belongs to a user. Holds comparisons and agent messages. |
+| `ChatMessage` | One message with the agent. Assistant rows fill in as the agent works: text, tool calls, trace id. |
+| `TraceSpan` | One OpenTelemetry span from an agent run. |
+| `Notification` | A message for one user, with a read time. |
+| `Tag`, `ArticleTag` | Labels on articles. Names are lowercase and unique. |
+| `User`, `Session`, `Account`, `Verification` | Accounts. Owned by Better Auth. Do not rename their fields. |
 
 ## Snapshots
 

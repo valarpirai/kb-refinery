@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { notify } from "@/lib/notify";
 import { pullSource } from "@/lib/ingest/connectors";
 import { syncAllSchedules } from "@/lib/ingest/schedule";
 import { answerArm, judgeComparison } from "@/lib/chat/answer";
@@ -57,15 +58,20 @@ export async function finalizeJobIfDone(jobId: string): Promise<void> {
   if (open) return;
   const failed = items.filter((i) => i.status === "failed").length;
   const skipped = items.filter((i) => i.status === "skipped").length;
-  await db.job.update({
-    where: { id: jobId },
-    data: {
-      completedAt: new Date(),
-      remainingBatches: 0,
-      articlesSkipped: skipped,
-      articlesProcessed: items.length - skipped - failed,
-      status: failed === 0 ? "completed" : failed === items.length ? "failed" : "completed_with_errors",
-    },
+  const status = failed === 0 ? "completed" : failed === items.length ? "failed" : "completed_with_errors";
+  // Only the run that actually flips the job to a final state notifies, so a repeat call stays silent.
+  const flipped = await db.job.updateMany({
+    where: { id: jobId, status: { notIn: ["completed", "completed_with_errors", "failed"] } },
+    data: { completedAt: new Date(), remainingBatches: 0, articlesSkipped: skipped, articlesProcessed: items.length - skipped - failed, status },
+  });
+  if (flipped.count === 0) return;
+  const job = await db.job.findUniqueOrThrow({ where: { id: jobId } });
+  const done = items.length - failed;
+  await notify(job.userId, {
+    level: status === "completed" ? "success" : status === "failed" ? "error" : "warning",
+    title: status === "completed" ? "Refining finished" : status === "failed" ? "Refining failed" : "Refining finished with errors",
+    body: `${done} of ${items.length} article${items.length === 1 ? "" : "s"} done${failed ? `, ${failed} failed. You can restart the failed ones.` : `. ${job.findingsGenerated} finding${job.findingsGenerated === 1 ? "" : "s"} found.`}`,
+    href: `/jobs/${jobId}`,
   });
 }
 

@@ -38,6 +38,10 @@ CSV and JSON need a title and a body. Column names are matched loosely. `Short D
 
 CSV or JSON only. Needs `number` and `short_description`. Optional: `description`, `resolution` (or `close_notes`), `category`, `opened_at`.
 
+## The agent on upload
+
+On the Import page, **Let the agent refine these for me** is ticked by default for articles. When the upload brings new or changed articles, the app opens a chat conversation and hands the import to the agent. The agent starts the refine job, and you get a notification when it ends. Untick the box to skip that. Scheduled pulls do the same. See `agent.md`.
+
 ## Re-uploading
 
 The app matches on id. For markdown and HTML files the id is the file name. Upload the same file again and:
@@ -91,7 +95,7 @@ Each pull makes an import run, shown on the source row and in import history. A 
 ### Safety
 
 - Only `http` and `https` URLs are fetched. Time limit is 30 seconds. Size limit is 5 MB.
-- The server fetches whatever URL you give it, including addresses on your own network. There is no login on this app, so run it only on a machine you trust.
+- The server fetches whatever URL you give it, including addresses on your own network. Anyone with an account can add a source, so give accounts only to people you trust.
 - The authorization header is saved as plain text in your local database. The API never returns it. The page shows only that one is set.
 - To change a source's connection, delete it and add it again.
 

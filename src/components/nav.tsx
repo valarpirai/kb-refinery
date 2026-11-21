@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NotificationCenter } from "@/components/notification-center";
 import { SignOutButton } from "@/components/sign-out-button";
 import type { SessionUser } from "@/lib/session";
 
@@ -23,6 +24,7 @@ export function Nav({ user }: { user: SessionUser }) {
           </Link>
         ))}
         <span className="ml-auto flex items-center gap-3 text-sm">
+          <NotificationCenter />
           <span className="opacity-70" title={user.email}>{user.name}</span>
           <SignOutButton />
         </span>

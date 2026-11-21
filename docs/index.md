@@ -12,7 +12,10 @@ KB Refinery reads knowledge base articles, finds what is wrong with them, and re
 | [ingestion.md](ingestion.md) | How articles and incidents get in. |
 | [pipeline.md](pipeline.md) | The stages, the LLM calls, and the queue. |
 | [pages.md](pages.md) | What each page shows. |
-| [chat.md](chat.md) | Compare answers from original and refined docs. |
+| [agent.md](agent.md) | The agent, its tools, and its traces. |
+| [chat.md](chat.md) | Chat: talk to the agent, or compare original and refined docs. |
+| [auth.md](auth.md) | Login, roles, the default admin. |
+| [notifications.md](notifications.md) | The bell and toasts. |
 
 ## Status
 
@@ -23,7 +26,13 @@ KB Refinery reads knowledge base articles, finds what is wrong with them, and re
 | Bulk upload (MD, HTML, TXT, CSV, JSON) | Done |
 | Pipeline and worker | Done, tested on one article |
 | Jobs API | Done |
-| Pages: home, jobs, job detail, report | Done. Not checked in a browser. |
+| Login, roles, default admin | Done |
+| Pages: home, articles, jobs, job detail, report, chat, traces | Done. Not checked in a browser. |
+| Pipeline view with restart from a failed stage | Done. Animation not seen. |
+| Heartbeats and recovery of stuck jobs | Done |
+| Agent (Strands) with Traceloop traces | Done |
+| Notifications | Done |
+| Tags on articles | Done |
 | Integrations page and scheduled pulls | Done. Tested with a local feed. |
 | Chat comparison (original vs refined) | Done. Tested on seed data only. |
 | Eval scorer | Not built |

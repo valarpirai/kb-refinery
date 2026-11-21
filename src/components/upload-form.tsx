@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 interface RunResult {
+  agentConversationId?: string | null;
   label: string;
   status: string;
   total: number;
@@ -19,6 +21,7 @@ export function UploadForm() {
   const [kind, setKind] = useState<"articles" | "incidents">("articles");
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+  const [useAgent, setUseAgent] = useState(true);
   const [result, setResult] = useState<RunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +32,7 @@ export function UploadForm() {
     setResult(null);
     const body = new FormData();
     body.set("kind", kind);
+    body.set("agent", useAgent ? "1" : "0");
     files.forEach((f) => body.append("files", f));
     try {
       const res = await fetch("/api/import", { method: "POST", body });
@@ -88,6 +92,16 @@ export function UploadForm() {
         </p>
       </div>
 
+      {kind === "articles" && (
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" checked={useAgent} onChange={(e) => setUseAgent(e.target.checked)} className="mt-1" />
+          <span>
+            Let the agent refine these for me
+            <span className="block text-xs opacity-70">It starts as soon as the upload is saved, and you get a notification when it finishes.</span>
+          </span>
+        </label>
+      )}
+
       <button
         type="submit"
         disabled={busy || files.length === 0}
@@ -104,6 +118,11 @@ export function UploadForm() {
               {result.label}: {result.created} created, {result.updated} updated, {result.skipped} unchanged
               {result.errors.length > 0 && `, ${result.errors.length} problem(s)`}.
             </p>
+            {result.agentConversationId && (
+              <p className="mt-1">
+                The agent is on it. <Link href={`/chat?c=${result.agentConversationId}`} className="text-blue-700 underline dark:text-blue-300">Watch it work</Link>
+              </p>
+            )}
             {result.errors.length > 0 && (
               <ul className="mt-1 list-disc pl-5 text-red-600">
                 {result.errors.slice(0, 10).map((m) => (

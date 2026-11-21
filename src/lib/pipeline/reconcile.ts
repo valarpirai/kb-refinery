@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { notify } from "@/lib/notify";
 import { getBoss, REFINE_QUEUE } from "@/lib/queue";
 import { finalizeJobIfDone } from "./jobs";
 import type { Stage } from "./run-article";
@@ -52,6 +53,8 @@ export async function reconcileJobs(): Promise<ReconcileSummary> {
         summary.failed++;
         if (item.analysisId) await db.analysis.update({ where: { id: item.analysisId }, data: { pipelineStage: "failed" } });
         await finalizeJobIfDone(item.jobId);
+        const owner = (await db.job.findUnique({ where: { id: item.jobId }, select: { userId: true } }))?.userId;
+        await notify(owner, { level: "error", title: "An article stopped responding", body: `It was stuck at the ${stage} stage ${item.attempts} times. Open the job to restart it.`, href: `/jobs/${item.jobId}` });
       }
       continue;
     }

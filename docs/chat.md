@@ -1,6 +1,13 @@
-# Chat comparison
+# Chat
 
-This is what the chat page does and how to read its results.
+Chat has two modes, set with the control by the message box.
+
+- **Agent** (default). Ask the agent to do work or report numbers. See `agent.md`.
+- **Compare docs.** Ask one question and compare the answer from original docs with the answer from refined docs. The rest of this page is about Compare.
+
+Conversations are saved per user. The sidebar lists them. You can rename or delete one. Both kinds of turn can sit in the same conversation.
+
+# Comparing original and refined
 
 ## The idea
 
@@ -45,7 +52,7 @@ A 4B model is a weak judge. Use its score as a hint. Your own verdict is the rea
 
 ## Reading the results
 
-The panel under the chat shows verdict totals and the average auto-judge score per side. A few dozen questions give a rough picture. Ask questions your users really ask, including ones an article only half answers.
+The sidebar footer shows your verdict totals. A few dozen questions give a rough picture. Ask questions your users really ask, including ones an article only half answers.
 
 ## Limits
 
@@ -63,5 +70,6 @@ The panel under the chat shows verdict totals and the average auto-judge score p
 | `src/lib/chat/indexer.ts` | Builds chunks and vectors |
 | `src/lib/chat/answer.ts` | Retrieval, answering, judging |
 | `src/app/api/compare/` | Ask, poll, save verdict, judge |
-| `src/components/chat-compare.tsx` | The side-by-side view |
+| `src/components/chat-shell.tsx`, `chat-turn.tsx` | The conversation and the side-by-side view |
+| `src/components/chat-agent.tsx` | An agent turn, with tool rows |
 | `prisma/seed/prompts/chat_*.md` | The answer and judge prompts |

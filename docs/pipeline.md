@@ -55,9 +55,38 @@ Other types, like structure problems, go straight to the rewrite. Incidents cann
 
 After analysis, the new article is compared with others in the same job. Articles that share a search term are candidates. At most three are checked. The model decides if they cover the same topic. A match adds a `duplicate` finding to both articles.
 
-## Failure
+## Failure and restart
 
-Any error is caught. The job item becomes `failed` with the message. The analysis stage becomes `failed`. The rest of the job continues. When every item is done, the job gets its final status.
+Any error is caught. The job item becomes `failed`. It keeps the error message and the stage it failed in (`failedStage`). The analysis stage becomes `failed`. The rest of the job continues. When every item is done, the job gets its final status.
+
+You can restart a failed article from the stage that failed, or any earlier one. A restart repeats that stage and the ones after it. It reuses the content and results the earlier run saved. You cannot start later than the failed stage, because that stage's input does not exist yet.
+
+Use the **Restart** button on the article's pipeline view or on the job page. It calls `POST /api/job-items/[id]/restart`. A restart goes ahead of the queue.
+
+## Heartbeats and recovery
+
+A worker can die mid-article: a crash, a kill, a closed laptop. The item would then say "analyzing" forever. Two things prevent that.
+
+**Heartbeats.** A worker claims an item in one atomic step. While it works, it stamps `heartbeatAt` every 15 seconds.
+
+**The reconciler.** A job runs every minute (a pg-boss cron). It looks for running items with no heartbeat for 90 seconds. For each one:
+
+- If the worker has tried fewer than 3 times, the item goes back to `pending`, set to resume at the stage it was on. A new queue message is sent. The next worker picks it up.
+- After 3 tries, the item is marked `failed` and the owner is notified.
+
+The timings are set with `HEARTBEAT_MS`, `HEARTBEAT_TIMEOUT_MS` and `MAX_ATTEMPTS`.
+
+### Why re-running is safe
+
+- **Claiming is atomic.** A worker takes an item only if it is `pending`. A duplicate queue message finds the item taken or finished and is dropped.
+- **A slow worker cannot overwrite a new one.** Every status write checks that this worker still holds the item. If not, it stops quietly.
+- **Each stage can run twice.** Convert drops leftover half-made versions first. Analyze cancels its earlier findings, replaces product mentions, and skips a duplicate pair it already saved. Enrich saves evidence with an upsert. Rewrite removes its earlier output before saving. Indexing deletes and rebuilds.
+- **The reconciler is conditional.** Every change it makes only applies if the item is unchanged since it was read. Two reconcilers cannot both win.
+
+Only refine jobs have heartbeats. Chat answers, agent messages and pulls do not.
+
+The code is in `src/lib/pipeline/reconcile.ts` and `worker-id.ts`.
+
 
 ## Known gaps
 
@@ -65,4 +94,4 @@ Any error is caught. The job item becomes `failed` with the message. The analysi
 - **Scores on short text.** Under 25 words, the mechanical score is empty.
 - **Low LLM scores on one test.** On a 17-word article, the raw and converted LLM scores came back 0 while the rewrite scored 95. Not yet checked. It may be the model judging a tiny article harshly. Test with real-length articles before trusting it.
 - **Speed is untested at scale.** Only one short article has run end to end.
-- **No retry for a crashed worker mid-article.** The queue will retry the item. The stages are not idempotent, so a retry may add duplicate findings.
+- **Heartbeat timing is untested under load.** The reconciler recovered a killed worker's item after about 90 seconds in one real test. A very slow model call is not a problem, because beats come from a timer, not from the model.

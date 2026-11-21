@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { startAgentTurn } from "@/lib/agent/start";
 import { db } from "@/lib/db";
+import { notify } from "@/lib/notify";
 import { runImport, type InputFile } from "./import";
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -98,7 +100,7 @@ export async function pullSource(dataSourceId: string) {
   if (!source) return null;
   try {
     const { kind, files, errors } = await collectFiles(source.type, source.config);
-    let run = await runImport({ kind, files, label: source.name, dataSourceId: source.id });
+    let run = await runImport({ kind, files, label: source.name, dataSourceId: source.id, userId: source.userId });
     if (errors.length > 0) {
       run = await db.importRun.update({
         where: { id: run.id },
@@ -113,12 +115,27 @@ export async function pullSource(dataSourceId: string) {
         lastMessage: `${run.created} created, ${run.updated} updated, ${run.skipped} unchanged${errors.length ? `; ${errors.length} URL(s) failed: ${errors[0]}` : ""}`.slice(0, 500),
       },
     });
+    await notify(source.userId, {
+      level: errors.length || (run.errors as string[]).length ? "warning" : "success",
+      title: `Pulled ${source.name}`,
+      body: `${run.created} new, ${run.updated} updated, ${run.skipped} unchanged.`,
+      href: "/integrations",
+    });
+    // New or changed articles go straight to the agent, which refines them and reports back.
+    if (kind === "articles" && source.userId && run.created + run.updated > 0) {
+      await startAgentTurn(
+        source.userId,
+        `The source "${source.name}" was pulled on schedule. It brought ${run.created} new and ${run.updated} updated articles (import run id: ${run.id}). Refine them.`,
+        { title: `Pull: ${source.name}` },
+      ).catch((e) => console.warn("[agent]", (e as Error).message));
+    }
     return run;
   } catch (e) {
     await db.dataSource.update({
       where: { id: source.id },
       data: { lastRunAt: new Date(), lastStatus: "failed", lastMessage: (e as Error).message.slice(0, 500) },
     });
+    await notify(source.userId, { level: "error", title: `Pull failed: ${source.name}`, body: (e as Error).message.slice(0, 300), href: "/integrations" });
     return null;
   }
 }

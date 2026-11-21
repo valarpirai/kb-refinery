@@ -30,6 +30,11 @@ All settings live in `.env`. The file is not committed. `.env.example` is.
 |---|---|---|
 | `DATABASE_URL` | local `kb_refinery`, user `postgres` | Postgres connection |
 | `SHADOW_DATABASE_URL` | scratch DB `kb_refinery_shadow` | Used only by `pnpm db:migrate`. See below. |
+| `BETTER_AUTH_SECRET` | none. Required. | Signs sessions. `openssl rand -base64 32` |
+| `ALLOW_SIGNUP` | `true` | `false` closes registration |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | `admin@example.com`, `change-me-now` | The admin that `pnpm db:seed` creates |
+| `TRACELOOP_API_KEY` | unset | If set, traces are also sent to Traceloop Cloud. See `agent.md`. |
+| `HEARTBEAT_MS`, `HEARTBEAT_TIMEOUT_MS`, `MAX_ATTEMPTS` | 15000, 90000, 3 | Worker heartbeat, how long silence counts as dead, tries before giving up |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Where Ollama listens |
 | `OLLAMA_MODEL` | `qwen3:4b-thinking-2507-q4_K_M` | Model to call |
 | `OLLAMA_THINK` | `auto` | `auto`, `always` or `never`. See pipeline.md. |
@@ -63,6 +68,10 @@ The worker does not hot reload. After changing pipeline code, restart `pnpm dev`
 | `pnpm db:reset` | Wipe the database, migrate, seed |
 | `pnpm exec tsc --noEmit` | Type check |
 | `pnpm lint` | Lint |
+
+## First sign-in
+
+After `pnpm db:seed`, sign in at `/login` with the admin from your `.env` (by default `admin@example.com` and `change-me-now`). Change that password for anything beyond your own machine. See `auth.md`.
 
 ## Start a run
 
