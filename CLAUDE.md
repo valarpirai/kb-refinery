@@ -7,7 +7,7 @@ Docs are in `docs/`. Start at `docs/index.md`.
 ## Rules
 
 - Use pnpm for everything. Never npm or yarn.
-- Two processes run the app: `pnpm dev` (web) and `pnpm worker` (pipeline and scheduled pulls). Pipeline and pull changes need the worker restarted. It does not hot reload.
+- `pnpm dev` runs two processes with concurrently: the web server (`pnpm dev:web`) and the worker (`pnpm worker`, pipeline and scheduled pulls). The worker does not hot reload, so restart `pnpm dev` after pipeline or pull changes.
 - The web server never calls the LLM. Only the worker does.
 - Schema lives in `prisma/schema.prisma`. After editing it, run `pnpm db:migrate`.
 - Prompts are rows in `PromptTemplate`, seeded from `prisma/seed/prompts/*.md`. Edit the file, then run `pnpm db:seed`.

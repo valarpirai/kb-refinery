@@ -3,14 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "concurrently -n web,worker -c blue,green \"pnpm dev:web\" \"pnpm worker\"",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
     "db:reset": "prisma migrate reset --force && pnpm db:seed",
-    "worker": "tsx --env-file=.env scripts/worker.ts"
+    "worker": "tsx --env-file=.env scripts/worker.ts",
+    "dev:web": "next dev --turbopack"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -36,6 +37,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/turndown": "^5.0.6",
+    "concurrently": "^10.0.7",
     "eslint": "^9",
     "eslint-config-next": "15.5.29",
     "prisma": "^6.19.3",

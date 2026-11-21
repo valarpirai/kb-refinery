@@ -8,8 +8,7 @@ Stack: Next.js 15, Tailwind 4, Prisma 6, PostgreSQL, pg-boss, Ollama. Package ma
 pnpm install
 cp .env.example .env
 pnpm db:migrate && pnpm db:seed
-pnpm dev        # web server
-pnpm worker     # pipeline worker, in a second terminal
+pnpm dev        # web server and pipeline worker together
 ```
 
 Full docs are in [docs/index.md](docs/index.md).

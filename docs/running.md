@@ -35,12 +35,22 @@ All settings live in `.env`. The file is not committed. `.env.example` is.
 
 ## Daily commands
 
-Run the web server and the worker in two terminals.
+One command starts both the web server and the worker:
 
 ```bash
-pnpm dev        # web server, http://localhost:3000
-pnpm worker     # pipeline worker
+pnpm dev        # web at http://localhost:3000, plus the worker
 ```
+
+Output is tagged `[web]` and `[worker]`. Ctrl+C stops both.
+
+To run them apart, for example to restart only the worker:
+
+```bash
+pnpm dev:web    # web server only
+pnpm worker     # worker only
+```
+
+The worker does not hot reload. After changing pipeline code, restart `pnpm dev`.
 
 | Command | What it does |
 |---|---|
