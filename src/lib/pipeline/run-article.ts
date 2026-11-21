@@ -24,6 +24,33 @@ async function setStatus(id: string, status: ItemStatus, message?: string) {
   if (result.count === 0) throw new ClaimLostError();
 }
 
+/**
+ * Run one stage and record how long it took. A failure is recorded too, then rethrown.
+ * Losing the claim to another worker is not recorded, because this run did not finish the work.
+ * @param itemId the job item
+ * @param articleId the article being processed
+ * @param stage convert, analyze, enrich, rewrite or index
+ * @param fn the stage work
+ * @return whatever the stage returns
+ */
+async function timed<T>(itemId: string, articleId: string, stage: string, fn: () => Promise<T>): Promise<T> {
+  const startedAt = new Date();
+  let status = "ok";
+  try {
+    return await fn();
+  } catch (e) {
+    if (e instanceof ClaimLostError) status = "lost";
+    else status = "error";
+    throw e;
+  } finally {
+    if (status !== "lost") {
+      await db.stageRun
+        .create({ data: { jobItemId: itemId, articleId, stage, status, startedAt, durationMs: Date.now() - startedAt.getTime() } })
+        .catch(() => undefined);
+    }
+  }
+}
+
 /** Mechanical score and counters for one body of content. */
 function mechanical(content: string) {
   const r = scoreContent(content);
@@ -317,7 +344,7 @@ export async function processJobItem(jobItemId: string, fromStage: Stage = "conv
       const partial = (await db.snapshot.findMany({ where: { analysisId, type: "raw" }, select: { version: true } })).map((x) => x.version).filter((v) => !done.has(v));
       if (partial.length) await db.snapshot.deleteMany({ where: { analysisId, version: { in: partial } } });
       version = ((await db.snapshot.aggregate({ where: { analysisId }, _max: { version: true } }))._max.version ?? 0) + 1;
-      converted = await convertStage(article, analysisId, jobId, version);
+      converted = await timed(item.id, article.id, "convert", () => convertStage(article, analysisId!, jobId, version));
     }
     if (!analysisId) throw new Error("No analysis to continue from");
 
@@ -328,8 +355,13 @@ export async function processJobItem(jobItemId: string, fromStage: Stage = "conv
       await setStatus(item.id, "analyzing");
       await db.analysis.update({ where: { id: analysisId }, data: { pipelineStage: "analyzing", lastJobId: jobId } });
       if (start === 1) await db.finding.updateMany({ where: { analysisId, state: { in: ["new", "acknowledged"] } }, data: { state: "cancelled" } });
-      result = await analyzeStage(article, analysisId, jobId, version, converted);
-      dupes = await findDuplicates(jobId, analysisId, result.standardized_summary, result.search_terms);
+      const analysisIdNow = analysisId;
+      const ran = await timed(item.id, article.id, "analyze", async () => {
+        const r = await analyzeStage(article, analysisIdNow, jobId, version, converted);
+        return { r, dupes: await findDuplicates(jobId, analysisIdNow, r.standardized_summary, r.search_terms) };
+      });
+      result = ran.r;
+      dupes = ran.dupes;
     } else {
       result = await rebuildAnalysis(analysisId, version);
     }
@@ -340,7 +372,7 @@ export async function processJobItem(jobItemId: string, fromStage: Stage = "conv
       stage = "enrich";
       await setStatus(item.id, "enriching");
       await db.analysis.update({ where: { id: analysisId }, data: { pipelineStage: "restructuring" } });
-      enrichment = await enrichStage(article, analysisId, result, converted);
+      enrichment = await timed(item.id, article.id, "enrich", () => enrichStage(article, analysisId!, result, converted));
     } else if (start === 3) {
       const saved = (await db.analysis.findUniqueOrThrow({ where: { id: analysisId } })).enrichmentKnowledge;
       enrichment = (saved as unknown as Awaited<ReturnType<typeof enrichStage>>) ?? null;
@@ -351,13 +383,13 @@ export async function processJobItem(jobItemId: string, fromStage: Stage = "conv
       await setStatus(item.id, "scoring");
       await db.analysis.update({ where: { id: analysisId }, data: { pipelineStage: "validating" } });
       await db.snapshot.deleteMany({ where: { analysisId, version, type: "enriched" } });
-      await synthesizeStage(article, analysisId, jobId, version, result, enrichment, converted);
+      await timed(item.id, article.id, "rewrite", () => synthesizeStage(article, analysisId!, jobId, version, result, enrichment, converted));
     }
 
     await db.analysis.update({ where: { id: analysisId }, data: { pipelineStage: "ready", sourceUpdatedAt: article.updatedAt } });
     await setStatus(item.id, "completed");
     // Chat search is a side benefit. If indexing fails, the article is still refined.
-    await indexArticle(article.id).catch((e) => console.warn(`[index] ${article.id}: ${(e as Error).message}`));
+    await timed(item.id, article.id, "index", () => indexArticle(article.id)).catch((e) => console.warn(`[index] ${article.id}: ${(e as Error).message}`));
     await db.job.update({
       where: { id: jobId },
       data: { findingsGenerated: { increment: result.findings.length }, duplicatesFound: { increment: dupes } },

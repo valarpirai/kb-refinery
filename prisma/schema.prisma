@@ -186,6 +186,7 @@ model Article {
   importRun   ImportRun?   @relation(fields: [importRunId], references: [id], onDelete: SetNull)
   analysis    Analysis?
   jobItems    JobItem[]
+  stageRuns   StageRun[]
   chunks      Chunk[]
   articleTags ArticleTag[]
 
@@ -373,9 +374,29 @@ model JobItem {
   article  Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
   analysis Analysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
 
+  stageRuns StageRun[]
+
   @@unique([jobId, articleId])
   @@index([jobId, status])
   @@index([status, heartbeatAt])
+}
+
+/// How long one stage took for one article. A restart or retry adds a new row, so history is kept.
+model StageRun {
+  id         String   @id @default(cuid())
+  jobItemId  String
+  articleId  String
+  stage      String // convert | analyze | enrich | rewrite | index
+  status     String // ok | error
+  startedAt  DateTime
+  durationMs Int
+  createdAt  DateTime @default(now())
+
+  jobItem JobItem @relation(fields: [jobItemId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([stage, startedAt])
+  @@index([articleId])
 }
 
 /// LLM prompts as data. `template` uses {{var}} placeholders.

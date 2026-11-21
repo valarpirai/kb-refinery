@@ -11,6 +11,7 @@ KB Refinery reads knowledge base articles, finds what is wrong with them, and re
 | [data-model.md](data-model.md) | Every table and what it holds. |
 | [ingestion.md](ingestion.md) | How articles and incidents get in. |
 | [pipeline.md](pipeline.md) | The stages, the LLM calls, and the queue. |
+| [metrics.md](metrics.md) | How long each refine stage takes. |
 | [pages.md](pages.md) | What each page shows. |
 | [agent.md](agent.md) | The agent, its tools, and its traces. |
 | [chat.md](chat.md) | Chat: talk to the agent, or compare original and refined docs. |
