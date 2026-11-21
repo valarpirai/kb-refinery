@@ -15,6 +15,10 @@ export const auth = betterAuth({
     autoSignIn: true,
     disableSignUp: process.env.ALLOW_SIGNUP === "false",
   },
+  user: {
+    // Set by the seed script, never by the sign-up form.
+    additionalFields: { role: { type: "string", defaultValue: "user", input: false } },
+  },
   // Dev falls back to 3001 when 3000 is busy.
   trustedOrigins: ["http://localhost:3000", "http://localhost:3001"],
   plugins: [nextCookies()],

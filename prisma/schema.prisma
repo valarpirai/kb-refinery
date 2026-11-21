@@ -128,6 +128,7 @@ enum ConnectorType {
 /// A configured external source that is pulled on a schedule.
 model DataSource {
   id          String        @id @default(cuid())
+  userId      String?
   name        String
   type        ConnectorType
   config      Json          @default("{}")
@@ -139,6 +140,7 @@ model DataSource {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   articles   Article[]
   importRuns ImportRun[]
 }
@@ -146,6 +148,7 @@ model DataSource {
 /// One upload or one scheduled pull. Groups the records it created.
 model ImportRun {
   id           String       @id @default(cuid())
+  userId       String?
   dataSourceId String?
   label        String // file name(s) or source name
   status       ImportStatus @default(pending)
@@ -158,8 +161,10 @@ model ImportRun {
   finishedAt   DateTime?
 
   dataSource DataSource? @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   articles   Article[]
   incidents  Incident[]
+  agentRuns  AgentRun[]
 }
 
 /// A source KB article. Replaces ServiceNow kb_knowledge.
@@ -344,6 +349,9 @@ model Job {
   lastJobAnalyses Analysis[] @relation("AnalysisLastJob")
   snapshots       Snapshot[]
   findings        Finding[]
+  user            User?      @relation(fields: [userId], references: [id])
+  userId          String?
+  agentRun        AgentRun?
 }
 
 /// One row per (job, article): the real per-article pipeline status.
@@ -415,13 +423,17 @@ model Chunk {
 
 /// One question asked against both variants.
 model Comparison {
-  id        String   @id @default(cuid())
-  query     String
-  verdict   Verdict?
-  note      String?
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  conversationId String
+  query          String
+  verdict        Verdict?
+  note           String?
+  createdAt      DateTime @default(now())
 
-  arms ComparisonArm[]
+  conversation Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  arms         ComparisonArm[]
+
+  @@index([conversationId, createdAt])
 }
 
 /// The answer from one variant.
@@ -451,11 +463,18 @@ model User {
   email         String   @unique
   emailVerified Boolean  @default(false)
   image         String?
+  role          String   @default("user") // "admin" or "user"
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions Session[]
-  accounts Account[]
+  sessions      Session[]
+  accounts      Account[]
+  conversations Conversation[]
+  notifications Notification[]
+  agentRuns     AgentRun[]
+  jobs          Job[]
+  importRuns    ImportRun[]
+  dataSources   DataSource[]
 }
 
 model Session {
@@ -502,4 +521,102 @@ model Verification {
   updatedAt  DateTime @updatedAt
 
   @@index([identifier])
+}
+
+// ---------------------------------------------------------------------------
+// Conversations, notifications and the agent
+// ---------------------------------------------------------------------------
+
+enum NotificationLevel {
+  info
+  success
+  warning
+  error
+}
+
+enum AgentTrigger {
+  upload
+  pull
+}
+
+enum AgentStatus {
+  running
+  completed
+  completed_with_errors
+  failed
+}
+
+enum AgentStepStatus {
+  pending
+  running
+  done
+  skipped
+  failed
+}
+
+/// A saved chat. Each question in it is a Comparison.
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comparisons Comparison[]
+
+  @@index([userId, updatedAt])
+}
+
+/// An in-app message for one user, shown in the bell and as a toast.
+model Notification {
+  id        String            @id @default(cuid())
+  userId    String
+  level     NotificationLevel @default(info)
+  title     String
+  body      String?
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+/// One autonomous run: picks up an import, refines it, reports back.
+model AgentRun {
+  id          String       @id @default(cuid())
+  userId      String?
+  trigger     AgentTrigger
+  status      AgentStatus  @default(running)
+  importRunId String?
+  jobId       String?      @unique
+  summary     String?
+  createdAt   DateTime     @default(now())
+  finishedAt  DateTime?
+
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  importRun ImportRun?  @relation(fields: [importRunId], references: [id], onDelete: SetNull)
+  job       Job?        @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  steps     AgentStep[]
+
+  @@index([userId, createdAt])
+}
+
+/// One visible step of an agent run, shown as a timeline.
+model AgentStep {
+  id         String          @id @default(cuid())
+  runId      String
+  ord        Int
+  key        String
+  title      String
+  status     AgentStepStatus @default(pending)
+  detail     String?
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, ord])
 }

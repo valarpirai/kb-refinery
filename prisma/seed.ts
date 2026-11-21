@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { auth } from "../src/lib/auth";
 import { articles, incidents, products } from "./seed/data";
 
 const db = new PrismaClient();
@@ -118,11 +120,48 @@ async function seedDemoRun() {
   }
 }
 
+/**
+ * Create the default admin account, or make sure the existing one is an admin.
+ * Credentials come from ADMIN_EMAIL and ADMIN_PASSWORD. An existing account keeps its password.
+ * Refuses to use the built-in default password in production.
+ */
+async function seedAdmin() {
+  const email = (process.env.ADMIN_EMAIL ?? "admin@example.com").trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD ?? "change-me-now";
+  const usingDefault = !process.env.ADMIN_PASSWORD;
+  if (usingDefault && process.env.NODE_ENV === "production") {
+    throw new Error("Set ADMIN_PASSWORD before seeding in production. The built-in default is not safe.");
+  }
+
+  const existing = await db.user.findUnique({ where: { email } });
+  if (existing) {
+    if (existing.role !== "admin") await db.user.update({ where: { id: existing.id }, data: { role: "admin" } });
+    console.log(`Admin ${email} already exists`);
+    return;
+  }
+
+  // Use Better Auth's own hasher so the seeded account signs in like any other.
+  const ctx = await auth.$context;
+  const hash = await ctx.password.hash(password);
+  const userId = randomUUID();
+  await db.user.create({
+    data: {
+      id: userId, email, name: "Admin", emailVerified: true, role: "admin",
+      accounts: { create: { id: randomUUID(), accountId: userId, providerId: "credential", password: hash } },
+    },
+  });
+  console.log(`Created admin ${email}${usingDefault ? " with the default password. Change it." : ""}`);
+}
+
 async function main() {
+  await seedAdmin();
   await seedPrompts();
   await seedCatalog();
   await seedDemoRun();
   console.log("Seed complete");
 }
 
-main().catch((e) => { console.error(e); process.exit(1); }).finally(() => db.$disconnect());
+main().catch((e) => { console.error(e); process.exit(1); }).finally(async () => {
+    await db.$disconnect();
+    process.exit(process.exitCode ?? 0); // auth keeps its own database client open
+  });
