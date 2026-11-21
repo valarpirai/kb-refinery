@@ -24,3 +24,15 @@ export function severityClass(severity: string | null | undefined): string {
   if (severity === "medium") return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200";
   return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
 }
+
+/**
+ * Show a byte count as a short size.
+ * @param bytes size in bytes, or null when unknown
+ * @return text such as 840 B, 11.5 KB or 2.1 MB, or a dash when unknown
+ */
+export function formatBytes(bytes: number | null | undefined): string {
+  if (bytes == null) return "–";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}

@@ -287,6 +287,42 @@
   }
 }
 
+/* File size at each version, under the rings. */
+.ph-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  margin: 14px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.ph-size {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.ph-size dt {
+  color: var(--ink-dim);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ph-size dd {
+  margin: 0;
+  font-weight: 600;
+}
+.ph-size-arrow {
+  color: var(--ink-faint);
+}
+
+/* Lets the core's fill animate. Without it, a custom property changes in one step. */
+@property --share {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 /* Core */
 .ph-aura {
   position: absolute;
@@ -325,12 +361,17 @@
   min-width: 92px;
   min-height: 92px;
   border-radius: 50%;
-  background: radial-gradient(circle at 42% 34%, #fff 0%, #fff 52%, #eefaf3 100%);
+  /* The AI-ready share fills the core like a pie, clockwise from twelve o'clock. */
+  background:
+    conic-gradient(from 0deg, rgba(0, 178, 113, 0.3) calc(var(--share) * 360deg), transparent 0),
+    radial-gradient(circle at 42% 34%, #fff 0%, #fff 52%, #eefaf3 100%);
   border: 1px solid #9fd8bb;
   box-shadow: 0 0 0 6px rgba(0, 178, 113, 0.08), 0 18px 40px -26px rgba(0, 131, 79, 0.6);
   text-align: center;
   z-index: 2;
-  transition: box-shadow 240ms linear;
+  transition:
+    box-shadow 240ms linear,
+    --share 700ms var(--ease-out);
 }
 .ph-core-active {
   box-shadow: 0 0 0 8px rgba(0, 178, 113, 0.14), 0 18px 40px -22px rgba(0, 131, 79, 0.7);
@@ -716,6 +757,9 @@
   .ph-source,
   .ph-arc-fill {
     transition: none;
+  }
+  .ph-core {
+    transition: box-shadow 240ms linear;
   }
   @keyframes ph-fade {
     from {

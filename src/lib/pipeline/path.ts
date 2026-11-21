@@ -98,6 +98,8 @@ export interface RefiningPath {
   steps: Record<string, StepState> | null;
   /** The chosen article, if any. */
   article: { id: string; title: string } | null;
+  /** Size in bytes of the chosen article at each version. A version that does not exist yet is null. */
+  sizes: { original: number | null; converted: number | null; rewritten: number | null } | null;
   /** True while the worker still has items in this job, so the page keeps refreshing. */
   live: boolean;
 }
@@ -169,6 +171,7 @@ export async function getRefiningPath(articleId?: string): Promise<RefiningPath>
   const chosen = articleId ? articles.find((x) => x.id === articleId) : undefined;
   const selectedArticleId = chosen?.id ?? "";
   const item = selectedArticleId ? await db.jobItem.findFirst({ where: { articleId: selectedArticleId }, orderBy: { updatedAt: "desc" }, select: { status: true, message: true, failedStage: true } }) : null;
+  const original = selectedArticleId ? await db.article.findUnique({ where: { id: selectedArticleId }, select: { body: true } }) : null;
   const analysis = selectedArticleId
     ? await db.analysis.findUnique({
         where: { articleId: selectedArticleId },
@@ -268,6 +271,13 @@ export async function getRefiningPath(articleId?: string): Promise<RefiningPath>
     here: chosen ? { stage: chosen.stage, label: chosen.label } : null,
     steps: chosen ? stepsFor(chosen.stage, item?.failedStage ?? null) : null,
     article: chosen ? { id: chosen.id, title: chosen.title } : null,
+    sizes: chosen
+      ? {
+          original: original ? Buffer.byteLength(original.body) : null,
+          converted: converted ? Buffer.byteLength(converted.content) : null,
+          rewritten: enriched ? Buffer.byteLength(enriched.content) : null,
+        }
+      : null,
     live: c.pending + working > 0,
   };
 }

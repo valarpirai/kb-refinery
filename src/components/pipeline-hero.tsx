@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LiveNumber, useBump } from "@/components/live-number";
+import { formatBytes } from "@/lib/format";
 import type { PaneData, PathStage, RefiningPath, StepState } from "@/lib/pipeline/path";
 import "./pipeline-hero.css";
 
@@ -25,7 +26,6 @@ const STEP_LABEL: Record<StepState, string> = { done: "Done", active: "In progre
 const STEP_FILL: Record<StepState, number> = { done: 1, active: 0.5, queued: 0.12, failed: 0.5, skipped: 0, waiting: 0 };
 
 const EXIT_COLOR: Record<string, string> = { no_gaps: "#94a3b8", failed: "#be0003" };
-const CORE_GREEN = { body: "#00b271", rgb: "0, 178, 113" };
 
 /**
  * One or more arcs on a ring, laid end to end from twelve o'clock, clockwise.
@@ -44,15 +44,6 @@ function Arc({ segments }: { segments: { share: number; color: string }[] }) {
         return node;
       })}
     </svg>
-  );
-}
-
-/** The ring around the core: AI-ready articles as a share of all refined ones. */
-function CoreRing({ share }: { share: number }) {
-  return (
-    <div className="ph-ring" style={{ "--d": "33cqw", "--c-rgb": CORE_GREEN.rgb } as React.CSSProperties}>
-      <Arc segments={[{ share, color: CORE_GREEN.body }]} />
-    </div>
   );
 }
 
@@ -243,9 +234,8 @@ export function PipelineHero({ data }: { data: RefiningPath }) {
             <div className="ph-bloom" />
             {!steps && <ExitRing exits={data.exits} />}
             {ring.map((s) => <Ring key={s.id} stage={s} active={selectedId === s.id} step={steps?.[s.id]} />)}
-            <CoreRing share={steps ? STEP_FILL[coreStep ?? "waiting"] : core?.progress ?? 0} />
             <div className="ph-aura" />
-            <div className={`ph-core ${selectedId === core?.id || (!focused && here?.stage === "ready") ? "ph-core-active" : ""}`}>
+            <div className={`ph-core ${selectedId === core?.id || (!focused && here?.stage === "ready") ? "ph-core-active" : ""}`} style={{ "--share": steps ? STEP_FILL[coreStep ?? "waiting"] : core?.progress ?? 0 } as React.CSSProperties}>
               {coreBumps > 0 && !steps && <span key={coreBumps} className="ph-core-ping" aria-hidden="true" />}
               {steps ? (
                 <>
@@ -263,6 +253,21 @@ export function PipelineHero({ data }: { data: RefiningPath }) {
             </div>
             <OrbitDot stage={focused ?? hereRing} />
           </div>
+          {data.sizes && (
+            <dl className="ph-sizes" aria-label="File size at each version">
+              {[
+                { label: "Original", bytes: data.sizes.original },
+                { label: "Markdown", bytes: data.sizes.converted },
+                { label: "Rewritten", bytes: data.sizes.rewritten },
+              ].map((x, i) => (
+                <div key={x.label} className="ph-size">
+                  {i > 0 && <span className="ph-size-arrow" aria-hidden="true">→</span>}
+                  <dt>{x.label}</dt>
+                  <dd><LiveNumber value={formatBytes(x.bytes)} /></dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
 
         <div className="ph-side">
