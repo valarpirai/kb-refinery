@@ -11,7 +11,8 @@
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
     "db:reset": "prisma migrate reset --force && pnpm db:seed",
     "worker": "tsx --env-file=.env scripts/worker.ts",
-    "dev:web": "next dev --turbopack"
+    "dev:web": "next dev --turbopack",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.11.0",
@@ -47,18 +48,24 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^8.0.0",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.13",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/turndown": "^5.0.6",
+    "@vitejs/plugin-react": "^6.3.0",
     "concurrently": "^10.0.7",
     "eslint": "^9",
     "eslint-config-next": "15.5.29",
+    "jsdom": "^31.0.1",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.1.1"
   }
 }
