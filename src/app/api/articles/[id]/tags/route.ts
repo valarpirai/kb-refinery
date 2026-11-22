@@ -18,11 +18,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!(await db.article.findUnique({ where: { id }, select: { id: true } }))) return NextResponse.json({ error: "Article not found" }, { status: 404 });
 
   const has = await db.articleTag.count({ where: { articleId: id } });
-  const tag = await db.tag.upsert({ where: { name }, create: { name }, update: {} });
-  const already = await db.articleTag.findUnique({ where: { articleId_tagId: { articleId: id, tagId: tag.id } } });
-  if (!already) {
-    if (has >= MAX_TAGS_PER_ARTICLE) return NextResponse.json({ error: `An article can have up to ${MAX_TAGS_PER_ARTICLE} tags` }, { status: 409 });
-    await db.articleTag.create({ data: { articleId: id, tagId: tag.id } });
-  }
+  const existing = await db.tag.findUnique({ where: { name } });
+  const already = existing ? await db.articleTag.findUnique({ where: { articleId_tagId: { articleId: id, tagId: existing.id } } }) : null;
+  // Check the limit before creating a tag, so a refused request leaves no orphan row.
+  if (!already && has >= MAX_TAGS_PER_ARTICLE) return NextResponse.json({ error: `An article can have up to ${MAX_TAGS_PER_ARTICLE} tags` }, { status: 409 });
+  const tag = existing ?? (await db.tag.upsert({ where: { name }, create: { name }, update: {} }));
+  if (!already) await db.articleTag.create({ data: { articleId: id, tagId: tag.id } });
   return NextResponse.json({ id: tag.id, name: tag.name }, { status: already ? 200 : 201 });
 }

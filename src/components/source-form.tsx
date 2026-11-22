@@ -30,16 +30,22 @@ export function SourceForm() {
         : { urls: get("urls").split(/\s+/).filter(Boolean), authHeader: get("authHeader") || undefined };
     setBusy(true);
     setError(null);
-    const res = await fetch("/api/sources", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: get("name"), type, config, cron: get("cron") }),
-    });
-    const json = await res.json();
-    setBusy(false);
-    if (!res.ok) return setError(json.error ?? "Could not save");
-    (e.target as HTMLFormElement).reset();
-    router.refresh();
+    const formEl = e.currentTarget;
+    try {
+      const res = await fetch("/api/sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: get("name"), type, config, cron: get("cron") }),
+      });
+      const json = await res.json();
+      if (!res.ok) return setError(json.error ?? "Could not save");
+      formEl.reset();
+      router.refresh();
+    } catch {
+      setError("Could not save");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

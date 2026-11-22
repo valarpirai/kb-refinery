@@ -9,8 +9,12 @@ export function SourceActions({ id, enabled, name }: { id: string; enabled: bool
   const [note, setNote] = useState<string | null>(null);
 
   async function call(url: string, init: RequestInit, done: string) {
-    const res = await fetch(url, init);
-    setNote(res.ok ? done : "Failed");
+    try {
+      const res = await fetch(url, init);
+      setNote(res.ok ? done : "Failed");
+    } catch {
+      setNote("Failed");
+    }
     router.refresh();
   }
   const btn = "rounded border border-black/20 px-2 py-1 text-xs dark:border-white/20";

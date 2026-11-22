@@ -29,15 +29,14 @@ describe("formatDuration", () => {
     [999, "999 ms"],
     [1000, "1.0 s"],
     [12_400, "12.4 s"],
-    [59_999, "60.0 s"],
+    [59_999, "1 min 0 s"],
     [60_000, "1 min 0 s"],
     [185_000, "3 min 5 s"],
   ])("formats %d ms as %s", (ms, text) => {
     expect(formatDuration(ms)).toBe(text);
   });
 
-  // Known bug: the seconds part is rounded after the minutes are split off, giving "1 min 60 s".
-  it.fails("rounds seconds up without showing 60 s inside a minute", () => {
+  it("rounds seconds up without showing 60 s inside a minute", () => {
     expect(formatDuration(119_600)).toBe("2 min 0 s");
   });
 });

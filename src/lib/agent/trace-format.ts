@@ -22,8 +22,9 @@ export function spanLabel(name: string): string {
  */
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)} ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
-  return `${Math.floor(ms / 60_000)} min ${Math.round((ms % 60_000) / 1000)} s`;
+  if (ms < 59_950) return `${(ms / 1000).toFixed(1)} s`;
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)} min ${total % 60} s`;
 }
 
 /** Tool names in the filter and list, from `execute_tool <name>` spans. */

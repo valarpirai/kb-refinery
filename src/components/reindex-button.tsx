@@ -8,8 +8,12 @@ export function ReindexButton() {
   const router = useRouter();
   const [note, setNote] = useState<string | null>(null);
   async function go() {
-    const res = await fetch("/api/chat/index", { method: "POST" });
-    setNote(res.ok ? "Queued. Refresh in a moment." : "Failed");
+    try {
+      const res = await fetch("/api/chat/index", { method: "POST" });
+      setNote(res.ok ? "Queued. Refresh in a moment." : "Failed");
+    } catch {
+      setNote("Failed");
+    }
     setTimeout(() => router.refresh(), 4000);
   }
   return (

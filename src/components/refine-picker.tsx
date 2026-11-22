@@ -22,8 +22,12 @@ export function RefinePicker() {
 
   useEffect(() => {
     const t = setTimeout(async () => {
-      const res = await fetch(`/api/articles?q=${encodeURIComponent(q)}`);
-      if (res.ok) setRows(await res.json());
+      try {
+        const res = await fetch(`/api/articles?q=${encodeURIComponent(q)}`);
+        if (res.ok) setRows(await res.json());
+      } catch {
+        // Keep the rows already shown when the search fails.
+      }
     }, 200);
     return () => clearTimeout(t);
   }, [q]);
@@ -39,15 +43,20 @@ export function RefinePicker() {
   async function start(all: boolean) {
     setBusy(true);
     setError(null);
-    const res = await fetch("/api/jobs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(all ? {} : { articleIds: [...picked] }),
-    });
-    const json = await res.json();
-    setBusy(false);
-    if (!res.ok) return setError(json.error ?? "Could not start the job");
-    router.push(`/jobs/${json.id}`);
+    try {
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(all ? {} : { articleIds: [...picked] }),
+      });
+      const json = await res.json();
+      if (!res.ok) return setError(json.error ?? "Could not start the job");
+      router.push(`/jobs/${json.id}`);
+    } catch {
+      setError("Could not start the job");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

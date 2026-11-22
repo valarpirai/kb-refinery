@@ -7,13 +7,14 @@ const h = vi.hoisted(() => ({
   atFind: vi.fn(),
   atCreate: vi.fn(),
   tagUpsert: vi.fn(),
+  tagFind: vi.fn(),
 }));
 vi.mock("@/lib/session", () => ({ getUser: h.getUser, unauthorized: () => Response.json({ error: "Sign in required" }, { status: 401 }) }));
 vi.mock("@/lib/db", () => ({
   db: {
     article: { findUnique: h.articleFind },
     articleTag: { count: h.atCount, findUnique: h.atFind, create: h.atCreate },
-    tag: { upsert: h.tagUpsert },
+    tag: { upsert: h.tagUpsert, findUnique: h.tagFind },
   },
 }));
 
@@ -28,6 +29,7 @@ describe("POST /api/articles/[id]/tags", () => {
     h.articleFind.mockResolvedValue({ id: "a1" });
     h.atCount.mockResolvedValue(0);
     h.atFind.mockResolvedValue(null);
+    h.tagFind.mockResolvedValue(null);
     h.tagUpsert.mockResolvedValue({ id: "t1", name: "vpn" });
   });
 
@@ -45,6 +47,7 @@ describe("POST /api/articles/[id]/tags", () => {
   });
 
   it("returns 200 and does not link again when the article already has the tag", async () => {
+    h.tagFind.mockResolvedValue({ id: "t1", name: "vpn" });
     h.atFind.mockResolvedValue({ articleId: "a1", tagId: "t1" });
     const res = await post({ name: "vpn" });
     expect(res.status).toBe(200);
@@ -74,10 +77,10 @@ describe("POST /api/articles/[id]/tags", () => {
     const res = await post({ name: "vpn" });
     expect(res.status).toBe(409);
     expect(h.atCreate).not.toHaveBeenCalled();
+    expect(h.tagUpsert).not.toHaveBeenCalled();
   });
 
-  /** Known bug: the route upserts the tag before checking the limit, leaving an orphan tag row. */
-  it.fails("does not create a tag row when the article is already at the limit", async () => {
+  it("does not create a tag row when the article is already at the limit", async () => {
     h.atCount.mockResolvedValue(20);
     await post({ name: "brand-new" });
     expect(h.tagUpsert).not.toHaveBeenCalled();

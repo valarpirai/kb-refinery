@@ -112,4 +112,26 @@ describe("RefinePicker", () => {
     expect(await screen.findByText("No articles found.")).toBeInTheDocument();
     await act(async () => {});
   });
+
+  it("shows an error and frees the button when starting the job fails on the network", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.startsWith("/api/articles")) return { ok: true, json: async () => rows };
+      throw new Error("offline");
+    }));
+    render(<RefinePicker />);
+    await open();
+    await userEvent.click(screen.getByLabelText(/VPN setup/));
+    await userEvent.click(screen.getByRole("button", { name: "Refine 1 selected" }));
+    expect(await screen.findByText("Could not start the job")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refine 1 selected" })).toBeEnabled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("keeps the shown rows when the search fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    render(<RefinePicker />);
+    await userEvent.click(screen.getByRole("button", { name: "Refine articles" }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+    expect(screen.getByRole("dialog", { hidden: true })).toBeInTheDocument();
+  });
 });

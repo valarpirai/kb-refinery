@@ -38,6 +38,10 @@ export function getBoss(): Promise<PgBoss> {
     await boss.createQueue(AGENT_QUEUE);
     await boss.createQueue(RECONCILE_QUEUE);
     return boss;
-  })();
+  })().catch((e) => {
+    // Do not cache a failed start, so the next call tries again.
+    globalForBoss.boss = undefined;
+    throw e;
+  });
   return globalForBoss.boss;
 }

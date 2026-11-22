@@ -32,4 +32,11 @@ describe("ReindexButton", () => {
     await userEvent.click(screen.getByRole("button", { name: "Rebuild index" }));
     expect(await screen.findByText("Failed")).toBeInTheDocument();
   });
+
+  it("says Failed when the network fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    render(<ReindexButton />);
+    await userEvent.click(screen.getByRole("button", { name: "Rebuild index" }));
+    expect(await screen.findByText("Failed")).toBeInTheDocument();
+  });
 });

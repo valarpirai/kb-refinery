@@ -76,4 +76,15 @@ describe("SourceForm", () => {
     const labels = [...container.querySelectorAll("datalist option")].map((o) => o.textContent);
     expect(labels).toEqual(["Manual only", "Every hour", "Every 6 hours", "Daily at 02:00", "Weekly, Monday 02:00"]);
   });
+
+  it("shows an error and frees the button when the network fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    render(<SourceForm />);
+    await userEvent.type(screen.getByLabelText("Name"), "X");
+    await userEvent.type(screen.getByLabelText("URL"), "https://example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Add source" }));
+    expect(await screen.findByText("Could not save")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add source" })).toBeEnabled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
 });

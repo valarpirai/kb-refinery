@@ -67,8 +67,7 @@ describe("getBoss", () => {
 });
 
 describe("getBoss failure recovery", () => {
-  // Known bug: a failed start is cached forever, so every later call rejects too.
-  it.fails("tries again after a failed start", async () => {
+  it("tries again after a failed start", async () => {
     vi.stubEnv("DATABASE_URL", "");
     const { getBoss } = await import("./queue");
     await expect(getBoss()).rejects.toThrow();

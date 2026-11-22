@@ -70,4 +70,12 @@ describe("SourceActions", () => {
     await waitFor(() => expect(f).toHaveBeenCalledWith("/api/sources/s1", { method: "DELETE" }));
     expect(await screen.findByText("Deleted")).toBeInTheDocument();
   });
+
+  it("says Failed and still refreshes when the network fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    render(<SourceActions id="s1" enabled name="Docs" />);
+    await userEvent.click(screen.getByRole("button", { name: "Run now" }));
+    expect(await screen.findByText("Failed")).toBeInTheDocument();
+    expect(refresh).toHaveBeenCalled();
+  });
 });
