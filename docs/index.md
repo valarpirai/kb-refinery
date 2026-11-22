@@ -18,6 +18,7 @@ KB Refinery reads knowledge base articles, finds what is wrong with them, and re
 | [auth.md](auth.md) | Login, roles, the default admin. |
 | [notifications.md](notifications.md) | The bell and toasts. |
 | [live-updates.md](live-updates.md) | How pages update without a reload. |
+| [production-todo.md](production-todo.md) | What is left before real users. |
 
 ## Status
 
