@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Refinery: AI-Ready Scoring</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --card:#f4f6f8; --line:#d8dde3; --raw:#c0392b; --conv:#d68910; --enr:#1e8449; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14171a; --fg:#e8eaed; --muted:#9aa0a6; --card:#1e2327; --line:#333b42; --raw:#ff7b6b; --conv:#f5b041; --enr:#58d68d; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.55 system-ui,sans-serif; }
+  main { max-width:820px; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font-size:1.8rem; margin:0 0 4px; }
+  h2 { font-size:1.2rem; margin:36px 0 8px; }
+  h3 { font-size:1rem; margin:20px 0 6px; color:var(--muted); }
+  p { margin:8px 0; }
+  ol, ul { margin:8px 0; padding-left:22px; }
+  .sub { color:var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin:12px 0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
+  .bar { display:flex; height:34px; border-radius:6px; overflow:hidden; margin:12px 0; font-size:.8rem; color:#fff; }
+  .bar span { display:flex; align-items:center; justify-content:center; }
+  .c1{background:#2e86c1}.c2{background:#8e44ad}.c3{background:#16a085}.c4{background:#d68910}.c5{background:#c0392b}
+  table { width:100%; border-collapse:collapse; margin:8px 0; font-size:.95rem; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  .flow { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+  .step { flex:1 1 180px; border:2px solid; border-radius:8px; padding:10px 12px; background:var(--card); }
+  .step b { display:block; }
+  .raw{border-color:var(--raw)}.conv{border-color:var(--conv)}.enr{border-color:var(--enr)}
+  code { background:var(--card); border:1px solid var(--line); border-radius:4px; padding:1px 5px; font-size:.9em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Knowledge Refinery: AI-Ready Scoring</h1>
+  <p class="sub">Every article gets a score out of 100. The score says how well the article survives being cut into chunks. AI retrieval cuts articles into chunks.</p>
+
+  <h2>Why score at all</h2>
+  <p>Many knowledge articles were written for people. AI agents and search systems read them differently. They see one chunk at a time. They cannot ask what "it" means.</p>
+  <p>Without a number, "AI-ready" is an opinion. A rubric gives you three things:</p>
+  <ul>
+    <li><b>A definition.</b> The criteria name what breaks retrieval.</li>
+    <li><b>A ranking.</b> Fix the worst articles first.</li>
+    <li><b>A measurement.</b> Score before and after. See if the rewrite helped.</li>
+  </ul>
+
+  <h2>The five criteria</h2>
+  <div class="bar" role="img" aria-label="Weights: 30, 25, 20, 15, 10">
+    <span class="c1" style="flex:30">30</span>
+    <span class="c2" style="flex:25">25</span>
+    <span class="c3" style="flex:20">20</span>
+    <span class="c4" style="flex:15">15</span>
+    <span class="c5" style="flex:10">10</span>
+  </div>
+  <table>
+    <tr><th>Criterion</th><th>Max</th><th>What costs points</th></tr>
+    <tr><td><b>Self-containedness</b></td><td>30</td><td>Sections that open with "This" or "It". Phrases like "see above". Acronyms never spelled out. Vague headings like "Overview". "The tool" instead of the product name.</td></tr>
+    <tr><td><b>Chunk geometry</b></td><td>25</td><td>Text before the first heading. Sections too big for one chunk (about 512 tokens).</td></tr>
+    <tr><td><b>Cleanliness</b></td><td>20</td><td>Too much markup. Junk content.</td></tr>
+    <tr><td><b>Completeness in text</b></td><td>15</td><td>Images with no alt text or explanation. Tables with no headers.</td></tr>
+    <tr><td><b>Reference integrity</b></td><td>10</td><td>Broken links.</td></tr>
+  </table>
+
+  <h2>Two scores, same rubric</h2>
+  <div class="grid">
+    <div class="card">
+      <b>Mechanical score</b>
+      <p>Plain code. It parses the text, counts hits, applies thresholds. No LLM. Same input, same score, every time.</p>
+      <p class="sub">Refuses content under 25 words.</p>
+    </div>
+    <div class="card">
+      <b>LLM score</b>
+      <p>A language model reads the article. It scores the same five criteria. The total must equal the five sub-scores added up.</p>
+      <p class="sub">Catches meaning that code cannot, such as whether a heading names its subject.</p>
+    </div>
+  </div>
+  <p>The mechanical score is repeatable but shallow. The LLM score is deeper but can drift. Together they check each other.</p>
+
+  <h2>From legacy article to AI-ready</h2>
+  <ol>
+    <li><b>Convert.</b> Turn the original HTML into clean markdown. Check every link. Broken ones become findings at once. No LLM.</li>
+    <li><b>Analyze.</b> The LLM lists quality findings. It adds search terms in users' own words, a one-line summary, and the products named. Articles with no gap stop here.</li>
+    <li><b>Enrich.</b> Articles with gaps get more. Find resolved support tickets on the same topic. Extract conditions, actions, escalation criteria and prerequisites. If tickets are thin, general product knowledge fills in.</li>
+    <li><b>Rewrite.</b> The LLM writes a complete replacement article. An agent can run the steps with no guessing. Each section stands alone.</li>
+    <li><b>Rescore.</b> Score the rewrite with the same prompt as the original.</li>
+  </ol>
+  <p class="sub">The rewrite never sees raw ticket text. It sees only the distilled knowledge. Sensitive data stays in one place.</p>
+
+  <h2>Three stages, six numbers</h2>
+  <p>Each run saves three snapshots. Each snapshot holds both scores.</p>
+  <div class="flow">
+    <div class="step raw"><b>1. Raw</b>The original HTML.</div>
+    <div class="step conv"><b>2. Converted</b>Clean markdown.</div>
+    <div class="step enr"><b>3. Enriched</b>Rewritten with ticket evidence.</div>
+  </div>
+  <div class="card">
+    <b>Why the same prompt three times?</b>
+    <p>A different prompt gives a different number. That holds even on the same text. A model also scores differently when the reply carries other work. So the full analysis prompt runs at all three stages. Only the quality score is kept from the raw and enriched runs. The comparison stays fair.</p>
+  </div>
+
+  <h2>Architecture</h2>
+  <p>Three layers. A web UI on top. A data model in the middle. An async pipeline underneath.</p>
+  <div class="grid">
+    <div class="card">
+      <b>Web UI</b>
+      <p>Home, pipeline view, job tracker, and a per-article report. Pages update live from record changes. No polling.</p>
+    </div>
+    <div class="card">
+      <b>Data model</b>
+      <p>Article analysis, snapshots, findings, evidence, products, mentions, jobs, job items, and prompt templates.</p>
+    </div>
+    <div class="card">
+      <b>Pipeline</b>
+      <p>An orchestrator, an LLM client, a callback handler, a mechanical scorer, and a ticket search.</p>
+    </div>
+  </div>
+
+  <h3>Data flow</h3>
+  <div class="card">
+    <p><b>Source article</b> → <b>Analysis</b> (one row per article, with its current stage)</p>
+    <ul>
+      <li><b>Snapshot:</b> append-only. Raw, converted and enriched content, each with both scores.</li>
+      <li><b>Finding:</b> a quality issue. Linked <b>Evidence</b> points to the tickets that support it.</li>
+      <li><b>Mention:</b> a product named in the article. Feeds a shared <b>Product index</b>.</li>
+    </ul>
+    <p><b>Job</b> is one run. <b>Job item</b> is one article in one run. Progress lives on the job item.</p>
+    <p><b>Prompt template</b> is a lookup table. Prompts are data, not code.</p>
+  </div>
+
+  <h3>How a run executes</h3>
+  <ol>
+    <li>A run creates one job item per article. It splits them into batches.</li>
+    <li>Each batch moves through converting, analyzing, enriching and scoring. It moves on its own. Batches finish at different times.</li>
+    <li>LLM calls are async. Each reply lands in a callback. The callback sends the item to its next stage or marks it done.</li>
+    <li>Every step is isolated per item. One failure never strands the rest of its batch.</li>
+    <li>A counter tracks unfinished batches. At zero, the job closes. It ends as completed, completed with errors, or failed.</li>
+  </ol>
+
+  <h3>Design choices</h3>
+  <ul>
+    <li><b>Snapshots never overwrite.</b> Every rerun adds rows. History comes free. Rows from one run share a version number. You never mix one run's raw with another run's enriched.</li>
+    <li><b>One article, one analysis row.</b> The source can live in any article table. So the link stores the table and the record.</li>
+    <li><b>Coarse job status, fine item status.</b> The job answers "is it done." The job item answers "where is this article."</li>
+  </ul>
+
+  <h2>How AI uses it</h2>
+  <h3>RAG search</h3>
+  <ol>
+    <li><b>Index.</b> The system cuts each article into chunks. It embeds each chunk.</li>
+    <li><b>Retrieve.</b> A user asks a question. The system finds the closest chunks.</li>
+    <li><b>Answer.</b> An LLM reads those chunks. It writes the reply.</li>
+  </ol>
+  <p>The model sees one chunk at a time. It cannot see the rest of the article. A chunk that opens with "This must be enabled first" is useless alone. Nobody knows what "this" is.</p>
+
+  <h3>AI agents</h3>
+  <p>An agent runs the steps with no human to ask. It needs prerequisites, numbered steps and clear conditions. It needs escalation criteria that say when to stop. The rewrite step writes exactly that.</p>
+
+  <h3>Chunk size</h3>
+  <p>Headings are where a splitter cuts. Each section should be one chunk. The rubric checks this.</p>
+  <table>
+    <tr><th>Rule</th><th>Value</th></tr>
+    <tr><td>Token cap per section</td><td>512</td></tr>
+    <tr><td>Rough size in prose</td><td>About 390 words</td></tr>
+    <tr><td>Token estimate</td><td>Words × 1.3, or characters ÷ 4. The higher one wins.</td></tr>
+    <tr><td>Valid section</td><td>Has a heading and fits under the cap.</td></tr>
+    <tr><td>Chunk score</td><td>25 × (words in valid sections ÷ all words)</td></tr>
+  </table>
+  <p>Characters ÷ 4 matters for dense text. Code, tables and IDs use more tokens than prose. A short table can break the cap.</p>
+  <div class="card">
+    <b>Example</b>
+    <p>An article has 1,000 words. A 600-word section runs about 780 tokens. It is over the cap. The other 400 words sit under headings and fit.</p>
+    <p>Coverage is 400 ÷ 1,000 = 0.4. The chunk score is 25 × 0.4 = 10 out of 25. Split the big section and the score rises.</p>
+  </div>
+  <p class="sub">Splitters differ. Some cut by tokens, some by headings. Headed, right-sized sections work with all of them.</p>
+
+  <div class="card">
+    <b>The gap today</b>
+    <p>The demo search agent searches the source articles. It does not search the rewrites. The rewrites sit in snapshots. Nothing publishes them back.</p>
+    <p>Until the rewrite reaches the searched articles, AI answers do not improve. That is the missing link.</p>
+  </div>
+
+  <h2>Reading a score</h2>
+  <table>
+    <tr><th>Range</th><th>Meaning</th></tr>
+    <tr><td>0–25</td><td>Not usable by AI. Rewrite first.</td></tr>
+    <tr><td>26–50</td><td>Weak. Many chunks lose their meaning alone.</td></tr>
+    <tr><td>51–75</td><td>Workable. Targeted fixes help.</td></tr>
+    <tr><td>76–100</td><td>AI-ready.</td></tr>
+  </table>
+  <p class="sub">These are reporting buckets, not a pass mark. No cut-off for "good enough" is set yet.</p>
+
+  <h2>What else the analysis finds</h2>
+  <p>Scores are one output. The analysis also raises findings, each with a severity and a quote from the article.</p>
+  <ul>
+    <li><b>duplicate:</b> two articles cover the same ground.</li>
+    <li><b>broken_link:</b> a link fails to resolve.</li>
+    <li><b>audience_mismatch:</b> steps need more access than the stated audience has.</li>
+    <li><b>image_dependent:</b> the meaning lives in images, not text.</li>
+    <li><b>missing_context:</b> a step assumes knowledge the article never gives.</li>
+    <li><b>unlinked_product:</b> a product is named but not linked or explained.</li>
+  </ul>
+  <p>Duplicate checks run in the background and never delay an article. An article unchanged since its last successful run is skipped.</p>
+
+  <h2>Current limits</h2>
+  <ul>
+    <li><b>No measured results yet.</b> No full run on real data has been confirmed.</li>
+    <li><b>The rubric is not proven.</b> Nothing yet shows that a higher score means better retrieval.</li>
+    <li><b>LLM score drift.</b> Repeat runs on one article may differ. Variance is untested.</li>
+    <li><b>Rewrites are not published.</b> They are stored as snapshots. No step pushes them back to the source article.</li>
+  </ul>
+  <div class="card">
+    <b>How to prove it</b>
+    <p>A table of real user queries already exists. Each query lists the articles cited. Each notes whether the user found the answer helpful. A side tool counts how many of a query's words appear in its article. It is a rough check. Someone runs it by hand. It is not tied to this rubric.</p>
+    <p>Next step: score those cited articles. Compare the scores with the feedback. If high scores track helpful answers, the rubric works.</p>
+  </div>
+
+  <h2>The payoff</h2>
+  <p>A clear before-and-after story: "Conversion lifted it from 38 to 55. Enrichment lifted it to 82."</p>
+  <p class="sub">Those numbers are illustrative. Measure your own corpus before quoting results.</p>
+</main>
+</body>
+</html>
