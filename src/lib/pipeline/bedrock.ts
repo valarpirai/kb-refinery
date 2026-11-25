@@ -1,6 +1,6 @@
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 import { z } from "zod";
-import { stripFence, type LlmResult } from "./ollama";
+import type { LlmResult } from "./ollama";
 
 export const BEDROCK_MODEL = process.env.BEDROCK_MODEL ?? "us.anthropic.claude-sonnet-4-5-20250929-v1:0";
 const MAX_TOKENS = Number(process.env.BEDROCK_MAX_TOKENS ?? 16_000);
@@ -20,6 +20,24 @@ function getClient(): BedrockRuntimeClient {
 }
 
 /**
+ * Parse a model reply as JSON. Tries the raw text first. If the reply is wrapped in a code fence or prose,
+ * it takes the text from the first "{" to the last "}". The fence stripper is not used, because a code block
+ * inside a string value would cut the JSON short.
+ * @param text raw model output
+ * @return the parsed value
+ */
+function parseReply(text: string): unknown {
+  try {
+    return JSON.parse(text.trim());
+  } catch (e) {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start === -1 || end <= start) throw e;
+    return JSON.parse(text.slice(start, end + 1));
+  }
+}
+
+/**
  * Send one prompt to Claude on Amazon Bedrock and parse the reply as JSON matching a schema.
  * Sonnet 4.5 has no structured output mode on Bedrock, so the schema goes in the prompt
  * and the reply is checked with zod. Retries once on a parse failure.
@@ -30,7 +48,7 @@ function getClient(): BedrockRuntimeClient {
  */
 export async function chatJsonBedrock<T>(prompt: string, schema: z.ZodType<T>, opts: { think?: boolean } = {}): Promise<LlmResult<T>> {
   void opts;
-  const jsonSchema = JSON.stringify(z.toJSONSchema(schema as z.ZodType));
+  const jsonSchema = JSON.stringify(z.toJSONSchema(schema, { io: "input" }));
   const system = `Reply with one JSON object and nothing else. No code fence. It must match this JSON Schema:\n${jsonSchema}`;
   let lastError = "";
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -46,7 +64,7 @@ export async function chatJsonBedrock<T>(prompt: string, schema: z.ZodType<T>, o
     if (res.stopReason === "guardrail_intervened" || res.stopReason === "content_filtered") throw new Error(`Bedrock blocked this request (${res.stopReason})`);
     const text = (res.output?.message?.content ?? []).flatMap((b) => (b.text ? [b.text] : [])).join("");
     try {
-      return { data: schema.parse(JSON.parse(stripFence(text))), thinking: "" };
+      return { data: schema.parse(parseReply(text)), thinking: "" };
     } catch (e) {
       lastError = (e as Error).message.slice(0, 300);
     }

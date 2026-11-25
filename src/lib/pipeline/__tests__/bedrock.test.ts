@@ -34,6 +34,25 @@ describe("chatJsonBedrock", () => {
     expect(input.system[0].text).toContain('"n"');
   });
 
+  it("builds the prompt for a schema with transforms", async () => {
+    const t = z.object({ s: z.string().nullish().transform((v) => v ?? "") });
+    h.send.mockResolvedValueOnce(reply("{}"));
+    expect((await chatJsonBedrock("p", t)).data).toEqual({ s: "" });
+  });
+
+  it("keeps a code fence inside a string value", async () => {
+    const t = z.object({ s: z.string() });
+    h.send.mockResolvedValueOnce(reply(JSON.stringify({ s: "run:\n```sh\nls\n```\ndone" })));
+    expect((await chatJsonBedrock("p", t)).data.s).toContain("```sh");
+  });
+
+  it("accepts a fenced reply whose string holds a code fence", async () => {
+    const t = z.object({ s: z.string() });
+    const body = JSON.stringify({ s: "run:\n```sh\nls\n```\ndone" }, null, 2);
+    h.send.mockResolvedValueOnce(reply("```json\n" + body + "\n```"));
+    expect((await chatJsonBedrock("p", t)).data.s).toContain("```sh");
+  });
+
   it("accepts a fenced reply", async () => {
     h.send.mockResolvedValueOnce(reply('```json\n{"n":2}\n```'));
     expect((await chatJsonBedrock("p", schema)).data).toEqual({ n: 2 });
