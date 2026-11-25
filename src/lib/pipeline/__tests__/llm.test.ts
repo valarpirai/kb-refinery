@@ -4,11 +4,14 @@ import { z } from "zod";
 const h = vi.hoisted(() => ({
   chatJsonClaude: vi.fn(),
   checkClaude: vi.fn(),
+  chatJsonBedrock: vi.fn(),
+  checkBedrock: vi.fn(),
   chatJsonOllama: vi.fn(),
   checkOllama: vi.fn(),
 }));
 
 vi.mock(".././claude", () => ({ chatJsonClaude: h.chatJsonClaude, checkClaude: h.checkClaude }));
+vi.mock(".././bedrock", () => ({ chatJsonBedrock: h.chatJsonBedrock, checkBedrock: h.checkBedrock }));
 vi.mock(".././ollama", () => ({ chatJson: h.chatJsonOllama, checkOllama: h.checkOllama }));
 
 const schema = z.object({ n: z.number() });
@@ -48,6 +51,16 @@ describe("llm provider routing", () => {
     expect(await m.chatJson("p", schema)).toEqual({ data: { n: 2 }, thinking: "" });
     expect(h.chatJsonClaude).toHaveBeenCalledWith("p", schema, {});
     expect(h.chatJsonOllama).not.toHaveBeenCalled();
+  });
+
+  it("routes to bedrock when LLM_PROVIDER is bedrock", async () => {
+    const m = await load("bedrock");
+    expect(m.LLM_PROVIDER).toBe("bedrock");
+    h.chatJsonBedrock.mockResolvedValue({ data: { n: 3 }, thinking: "" });
+    expect(await m.chatJson("p", schema)).toEqual({ data: { n: 3 }, thinking: "" });
+    expect(h.chatJsonBedrock).toHaveBeenCalledWith("p", schema, {});
+    h.checkBedrock.mockResolvedValue("no token");
+    expect(await m.checkLlm()).toBe("no token");
   });
 
   it("checks the matching service", async () => {

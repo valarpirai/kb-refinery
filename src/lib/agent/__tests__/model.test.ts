@@ -2,10 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const anthropic = vi.fn();
 const openai = vi.fn();
+const bedrock = vi.fn();
 vi.mock("@strands-agents/sdk/models/anthropic", () => ({
   AnthropicModel: class {
     constructor(o: unknown) {
       anthropic(o);
+    }
+  },
+}));
+vi.mock("@strands-agents/sdk/models/bedrock", () => ({
+  BedrockModel: class {
+    constructor(o: unknown) {
+      bedrock(o);
     }
   },
 }));
@@ -20,9 +28,10 @@ vi.mock("@strands-agents/sdk/models/openai", () => ({
 beforeEach(() => vi.resetModules());
 afterEach(() => vi.unstubAllEnvs());
 
-async function load(provider: "anthropic" | "ollama") {
+async function load(provider: "anthropic" | "ollama" | "bedrock") {
   vi.doMock("@/lib/pipeline/llm", () => ({ LLM_PROVIDER: provider }));
   vi.doMock("@/lib/pipeline/claude", () => ({ CLAUDE_MODEL: "claude-test" }));
+  vi.doMock("@/lib/pipeline/bedrock", () => ({ BEDROCK_MODEL: "bedrock-test" }));
   return (await import(".././model")).makeModel;
 }
 
@@ -39,6 +48,14 @@ describe("makeModel", () => {
     const makeModel = await load("anthropic");
     makeModel();
     expect(anthropic).toHaveBeenCalledWith({ modelId: "claude-test", maxTokens: 500 });
+  });
+
+  it("builds a Bedrock model with the region and token cap", async () => {
+    vi.stubEnv("AWS_REGION", "us-west-2");
+    const makeModel = await load("bedrock");
+    makeModel();
+    expect(bedrock).toHaveBeenCalledWith({ modelId: "bedrock-test", region: "us-west-2", maxTokens: 16000 });
+    expect(anthropic).not.toHaveBeenCalled();
   });
 
   it("builds an Ollama model with defaults", async () => {

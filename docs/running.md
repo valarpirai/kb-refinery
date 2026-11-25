@@ -41,6 +41,13 @@ All settings live in `.env`. The file is not committed. `.env.example` is.
 | `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Model that makes chat search vectors |
 | `OLLAMA_NUM_CTX` | `16384` | Context window sent to Ollama |
 | `OLLAMA_TIMEOUT_MS` | `600000` | Per-call timeout |
+| `LLM_PROVIDER` | `ollama` | `ollama`, `anthropic` or `bedrock` |
+| `AWS_BEARER_TOKEN_BEDROCK` | unset | Bedrock API key. Used when `LLM_PROVIDER=bedrock`. The usual AWS credential chain also works. |
+| `AWS_REGION` | `us-east-1` | Bedrock region |
+| `BEDROCK_MODEL` | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | Bedrock model or inference profile ID |
+| `BEDROCK_MAX_TOKENS`, `BEDROCK_TIMEOUT_MS` | 16000, 600000 | Output cap and per-call timeout |
+
+Bedrock has no structured output mode for Sonnet 4.5. The pipeline sends the JSON schema in the system prompt and checks the reply with zod. Chat embeddings still use Ollama.
 
 ## Daily commands
 

@@ -1,10 +1,15 @@
 import { AnthropicModel } from "@strands-agents/sdk/models/anthropic";
+import { BedrockModel } from "@strands-agents/sdk/models/bedrock";
 import { OpenAIModel } from "@strands-agents/sdk/models/openai";
 import { LLM_PROVIDER } from "@/lib/pipeline/llm";
 import { CLAUDE_MODEL } from "@/lib/pipeline/claude";
+import { BEDROCK_MODEL } from "@/lib/pipeline/bedrock";
 
-/** The agent's model: Claude when LLM_PROVIDER is "anthropic", otherwise Ollama's OpenAI-compatible endpoint. */
+/** The agent's model: Claude on Bedrock or the Claude API, or otherwise Ollama's OpenAI-compatible endpoint. */
 export function makeModel() {
+  if (LLM_PROVIDER === "bedrock") {
+    return new BedrockModel({ modelId: BEDROCK_MODEL, region: process.env.AWS_REGION ?? "us-east-1", maxTokens: Number(process.env.BEDROCK_MAX_TOKENS ?? 16_000) });
+  }
   if (LLM_PROVIDER === "anthropic") {
     return new AnthropicModel({ modelId: CLAUDE_MODEL, maxTokens: Number(process.env.ANTHROPIC_MAX_TOKENS ?? 16_000) });
   }
